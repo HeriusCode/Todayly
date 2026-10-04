@@ -1,0 +1,42 @@
+export const mockFoods = [
+  {
+    id: 'f-1',
+    name: 'Bún Chả Cá Đà Nẵng - Quán Bà Phiến',
+    category: 'Ăn trưa',
+    mealType: 'lunch',
+    rating: 4.8,
+    reviewsCount: 236,
+    priceRange: '35.000 – 65.000đ',
+    minPrice: 35000,
+    maxPrice: 65000,
+    distance: '1.2 km',
+    distanceNum: 1.2,
+    openHours: '06:00 - 22:00',
+    isOpen: true,
+    address: '63 Lê Hồng Phong, Hải Châu, Đà Nẵng',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuC_5KeFSUOMCPzUXXmKrm6ss5TBFPLg0zsgZbj028GekOT5sXMjLWbOU_VMw-zTBREbqeECNdQaPVHONoVOJXRaQ6ZJai0ZgJEMZZeVX1xdqYHt7hIgLerPhfOBnP-kleD-0F4G68Ju9BONUNv3a-A3_Yv-zE5d4JPTAWHAglR560ohp-6N6PHTRqe6rTsAQzuuKBLPv54XiI94F5ASQfwK8SknzngApn2xsidGumEG84qIRbwAVyRy',
+    tags: ['Đặc sản', 'Bữa trưa', 'Nước dùng ngọt thanh'],
+    isFeatured: true,
+    description: 'Bún chả cá thơm ngọt đậm đà từ bí đỏ, bắp cải và xương cá thu tươi, chả cá chiên và hấp dai giòn thủ công.'
+  },
+  {
+    id: 'f-2',
+    name: 'Mì Quảng Ếch Bà Mua',
+    category: 'Ăn trưa',
+    mealType: 'lunch',
+    rating: 4.7,
+    reviewsCount: 128,
+    priceRange: '40.000 – 60.000đ',
+    minPrice: 40000,
+    maxPrice: 60000,
+    distance: '850m',
+    distanceNum: 0.85,
+    openHours: '06:30 - 21:30',
+    isOpen: true,
+    address: '19 Trần Bình Trọng, Hải Châu, Đà Nẵng',
+    image: 'https://lh3.googleusercontent.com/aida-public/AB6AXuDSVL1oxnkisdSn-4ugM2unO7de_AlEUuYoD888osAFfrLwgjNOP4mohiwvsE7Uz-_ieIDIagV4vCkFm2pkaY72SOf3nGLLr4VLYbhtsVGxWH_9jcf18br9w0GMTFGQXobfSyZy1xm-_qt4iCzYq-93FLoD77Z4J4EAertqQ78lHGNIOVFNMSibrPqP79F-uo2Cr2uegdCMEUbt_ZEPu8i7acmCzCotYRbevmNae2BcIYjcQylYjvc8',
+    tags: ['Đặc sản Đà Nẵng', 'Mì Quảng', 'Thịt ếch om sả'],
+    isFeatured: false,
+    description: 'Sợi mì vàng óng ăn kèm ếch đồng om sả ớt trong thố đất nghi ngút khói, bánh tráng nướng mè giòn rụm.'
+  }
+];
