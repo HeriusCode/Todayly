@@ -1,0 +1,26 @@
+/* Wider desktop canvas for every primary Todayly page. */
+@media (min-width: 1280px) {
+  .max-w-7xl,
+  .w-full > .max-w-6xl.mx-auto,
+  .w-full > .max-w-4xl.mx-auto {
+    max-width: min(100vw, 1800px) !important;
+  }
+}
+
+/* The transparent brand asset is intentionally larger than the old icon. */
+img[src='/todayly-logo.png'] {
+  width: 64px !important;
+  height: 64px !important;
+  margin-block: -8px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+@media (max-width: 639px) {
+  img[src='/todayly-logo.png'] {
+    width: 52px !important;
+    height: 52px !important;
+    margin-block: -4px;
+  }
+}
+

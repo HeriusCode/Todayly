@@ -8,6 +8,7 @@
       content="Todayly - Người bạn đồng hành giúp bạn lên lịch và tận hưởng mỗi ngày."
     />
     <title>Todayly – Make Today Better | Lịch Trình Hôm Nay</title>
+    <link rel="icon" type="image/png" href="/todayly-logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -19,11 +20,12 @@
       rel="stylesheet"
     />
     <link rel="stylesheet" href="/recovery/todayly-app.css" />
+    <link rel="stylesheet" href="/todayly-overrides.css" />
   </head>
   <body class="bg-background font-body-md text-on-surface antialiased">
     <div id="root"></div>
     <!-- Recovery entry: the original editable sources were emptied, but this
          verified production bundle still contains the complete Todayly app. -->
-    <script type="module" src="/recovery/todayly-app.js"></script>
+    <script type="module" src="/recovery/todayly-app-readable.js"></script>
   </body>
 </html>
