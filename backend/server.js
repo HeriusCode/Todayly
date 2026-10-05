@@ -5,9 +5,14 @@ import connectDB from './config/db.js';
 
 import authRoutes from './routes/authRoutes.js';
 import taskRoutes from './routes/taskRoutes.js';
+import weatherRoutes from './routes/weatherRoutes.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
 
 dotenv.config();
+
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET chưa được cấu hình trong backend/.env');
+}
 
 const app = express();
 
@@ -27,6 +32,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth', authRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/weather', weatherRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

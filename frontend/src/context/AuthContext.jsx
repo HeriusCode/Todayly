@@ -3,39 +3,30 @@ import { authService } from '../services/authService';
 
 const AuthContext = createContext();
 
-const defaultUser = {
-  name: 'Mai Linh',
-  email: 'mailinh@todayly.vn',
-  avatar: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAs8RRecSTQGaXt0G9jAZj3inZF63HILmxziYUMS3mBoj1dFfohnZk_zbO6AcZ0765E62hGaYA2JKinZUy-IFIhSRzcQ3GQcZnmdWkZ0aKsycKl_PtOmxQD1CMrNNWNZDkvniMZ-xB2mr0eLh1jxDelxAzUpv5sqgtdgsuGqhFhnAVp9BVG4dDXACe5geALaOVncnol1KQx3PARbdXSM6_Yu1MijkBjwq4SIw4FVPx-kw4afdNM9pf5',
-  bio: 'Yêu thích lối sống tối giản, thảnh thơi và tích cực mỗi ngày.',
-  city: 'Đà Nẵng',
-  wakeUpTime: '06:30',
-  sleepTime: '23:00',
-  dietaryPreference: 'Thanh đạm, ít ngọt',
-  favoriteStyle: 'Smart-Casual',
-  transportation: 'Xe máy & Đi bộ',
-};
-
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('todayly_user');
-    return saved ? JSON.parse(saved) : defaultUser;
-  });
+  const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('todayly_token'));
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchUser = async () => {
       const storedToken = localStorage.getItem('todayly_token');
-      if (storedToken) {
-        try {
-          const freshUser = await authService.getCurrentUser();
-          setUser(freshUser);
-        } catch {
-          // Nếu backend tạm thời offline, vẫn giữ user từ local
-        }
+      if (!storedToken || storedToken.split('.').length !== 3) {
+        authService.logout();
+        setToken(null);
+        setUser(null);
+        setLoading(false);
+        return;
       }
-      setLoading(false);
+      try {
+        setUser(await authService.getCurrentUser());
+      } catch {
+        authService.logout();
+        setToken(null);
+        setUser(null);
+      } finally {
+        setLoading(false);
+      }
     };
     fetchUser();
   }, []);
@@ -67,19 +58,17 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider
-      value={{
-        user,
-        token,
-        isAuthenticated: !!token && !!user,
-        login,
-        register,
-        updateUserPreferences,
-        logout,
-        loading,
-        setUser,
-      }}
-    >
+    <AuthContext.Provider value={{
+      user,
+      token,
+      isAuthenticated: Boolean(token && user),
+      login,
+      register,
+      updateUserPreferences,
+      logout,
+      loading,
+      setUser,
+    }}>
       {children}
     </AuthContext.Provider>
   );

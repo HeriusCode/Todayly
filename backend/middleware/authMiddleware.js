@@ -15,7 +15,7 @@ export const protect = async (req, res, next) => {
   try {
     const decoded = jwt.verify(
       authorization.slice(7),
-      process.env.JWT_SECRET || 'todayly_secret',
+      process.env.JWT_SECRET,
     );
     req.user = await User.findById(decoded.id).select('-password');
     if (!req.user) return res.status(401).json({ message: 'Tài khoản không còn tồn tại.' });

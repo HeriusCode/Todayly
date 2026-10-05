@@ -90,3 +90,19 @@ img[src='/todayly-logo.png'] {
   }
 }
 
+/* Google Calendar-style Weekly Grid Layout */
+.todayly-week-header,
+.todayly-week-grid {
+  display: grid !important;
+  grid-template-columns: 70px repeat(7, minmax(0, 1fr)) !important;
+  width: 100% !important;
+}
+
+@media (max-width: 768px) {
+  .todayly-week-header,
+  .todayly-week-grid {
+    grid-template-columns: 55px repeat(7, minmax(95px, 1fr)) !important;
+    min-width: 720px !important;
+  }
+}
+

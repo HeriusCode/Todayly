@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 const taskSchema = new mongoose.Schema(
   {
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     title: { type: String, required: true, trim: true },
     scheduledDate: {
       type: String,
@@ -12,17 +13,9 @@ const taskSchema = new mongoose.Schema(
     time: { type: String, default: '09:00 – 10:30' },
     startTime: { type: String, default: '09:00' },
     endTime: { type: String, default: '10:30' },
-    activityType: {
-      type: String,
-      enum: ['task', 'food', 'place'],
-      default: 'task',
-    },
+    activityType: { type: String, enum: ['task', 'food', 'place'], default: 'task' },
     category: { type: String, default: 'Công việc' },
-    priority: {
-      type: String,
-      enum: ['high', 'medium', 'low'],
-      default: 'medium',
-    },
+    priority: { type: String, enum: ['high', 'medium', 'low'], default: 'medium' },
     matrixQuadrant: {
       type: String,
       enum: [
@@ -48,6 +41,6 @@ const taskSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-taskSchema.index({ scheduledDate: 1, startTime: 1 });
+taskSchema.index({ user: 1, scheduledDate: 1, startTime: 1 });
 
 export default mongoose.model('Task', taskSchema);

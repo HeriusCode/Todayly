@@ -22,8 +22,8 @@ export default function Profile() {
       setProfileData({
         name: user.name || '',
         email: user.email || '',
-        bio: user.bio || 'Yêu thích lối sống tối giản, thảnh thơi và tích cực mỗi ngày.',
-        city: user.city || 'Đà Nẵng',
+        bio: user.bio || '',
+        city: user.city || '',
         wakeUpTime: user.wakeUpTime || '06:30',
         sleepTime: user.sleepTime || '23:00',
         dietaryPreference: user.dietaryPreference || 'Thanh đạm, ít ngọt',

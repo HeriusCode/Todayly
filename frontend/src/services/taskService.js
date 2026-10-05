@@ -2,6 +2,8 @@ import api from './api';
 
 export const taskService = {
   getAll: async (params = {}) => {
+    const token = localStorage.getItem('todayly_token');
+    if (!token || token.split('.').length !== 3) return [];
     const response = await api.get('/tasks', { params });
     return response.data;
   },
