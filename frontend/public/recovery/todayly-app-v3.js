@@ -199,7 +199,7 @@ Please change the parent <Route path="${e}"> to <Route path="${e===`/`?`*`:`${e}
       ]})
     ]}),
 
-    // 2. Tabs and Date Picker Bar (neatly aligned icon and date)
+    // 2. Tabs and Date Picker Bar
     (0,R.jsxs)(`div`,{className:`flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-surface-container-lowest p-2 shadow-sm border border-outline-variant/20`,children:[
       (0,R.jsxs)(`div`,{className:`flex flex-wrap gap-2`,children:[
         [`today`,`Hôm nay`],[`tomorrow`,`Ngày mai`],[`week`,`Lịch tuần`]
@@ -227,92 +227,118 @@ Please change the parent <Route path="${e}"> to <Route path="${e===`/`?`*`:`${e}
     ]}),
 
     // 4. View Switch: If o === 'week', show the Google Calendar Weekly Schedule Grid (Image 2)
-    o===`week`?(0,R.jsxs)(`section`,{className:`rounded-3xl bg-surface-container-lowest shadow-sm border border-outline-variant/30 overflow-hidden flex flex-col`,children:[
-      // Calendar Week Header Row (FORCED 8 COLUMNS VIA INLINE STYLE + CSS CLASS)
-      (0,R.jsxs)(`div`,{
-        className:`todayly-week-header border-b border-outline-variant/30 bg-surface-container-lowest sticky top-0 z-30`,
-        style:{display:`grid`,gridTemplateColumns:`70px repeat(7, minmax(0, 1fr))`,width:`100%`},
+    o===`week`?(0,R.jsx)(`section`,{
+      className:`rounded-3xl bg-surface-container-lowest shadow-sm border border-outline-variant/30 overflow-hidden`,
+      children:(0,R.jsxs)(`div`,{
+        className:`todayly-week-scroll-container`,
+        style:{overflowX:`auto`,overflowY:`auto`,maxHeight:`680px`,position:`relative`,backgroundColor:`#ffffff`},
         children:[
-          (0,R.jsx)(`div`,{className:`p-3 flex items-end justify-center text-[11px] font-semibold text-outline pb-3 border-r border-outline-variant/20`,children:`GMT+07`}),
-          weekDays.map(day=>(0,R.jsxs)(`div`,{key:day.name,className:`flex flex-col items-center justify-center py-2.5 border-r last:border-r-0 border-outline-variant/20`,children:[
-            (0,R.jsx)(`span`,{className:`text-[11px] font-bold tracking-wider ${day.isToday?`text-blue-600`:`text-on-surface-variant`}`,children:day.name}),
-            (0,R.jsx)(`div`,{className:`mt-1 flex items-center justify-center text-sm font-bold ${day.isToday?`w-8 h-8 rounded-full bg-blue-600 text-white shadow-xs`:`text-on-surface`}`,children:day.dayNum})
-          ]}))
-        ]
-      }),
-
-      // Calendar Time Slots Grid
-      (0,R.jsx)(`div`,{className:`relative overflow-x-auto overflow-y-auto max-h-[640px] scrollbar-thin`,children:
-        (0,R.jsxs)(`div`,{
-          className:`todayly-week-grid relative min-w-[700px]`,
-          style:{display:`grid`,gridTemplateColumns:`70px repeat(7, minmax(0, 1fr))`,width:`100%`,minWidth:`700px`},
-          children:[
-            // Left Hours Column (24 rows)
-            (0,R.jsx)(`div`,{className:`flex flex-col border-r border-outline-variant/20 select-none bg-surface-container-lowest`,children:
-              hoursList.map(hr=>(0,R.jsx)(`div`,{
-                key:hr.h,
-                style:{height:`${rowHeight}px`},
-                className:`relative flex items-start justify-end pr-2 pt-0.5 text-[11px] text-outline border-b border-outline-variant/15 font-medium`,
-                children:hr.label?(0,R.jsx)(`span`,{className:`relative -top-2.5`,children:hr.label}):null
+          // STICKY WEEK HEADER: Always stays fixed when scrolling up/down!
+          (0,R.jsxs)(`div`,{
+            className:`todayly-week-header`,
+            style:{display:`grid`,gridTemplateColumns:`70px repeat(7, minmax(0, 1fr))`,width:`100%`,minWidth:`700px`,position:`sticky`,top:0,zIndex:40,backgroundColor:`#ffffff`,borderBottom:`1px solid #e2e8f0`,boxShadow:`0 2px 6px rgba(0,0,0,0.04)`},
+            children:[
+              (0,R.jsx)(`div`,{
+                className:`p-3 flex items-center justify-center text-[11px] font-bold text-slate-400 border-r border-slate-200 select-none`,
+                children:`GMT+07`
+              }),
+              weekDays.map(day=>(0,R.jsxs)(`div`,{
+                key:day.name,
+                className:`flex flex-col items-center justify-center py-2.5 border-r last:border-r-0 border-slate-200`,
+                children:[
+                  (0,R.jsx)(`span`,{
+                    className:day.isToday?`todayly-today-label`:`text-[11px] font-bold tracking-wider text-slate-500`,
+                    style:day.isToday?{color:`#ea580c`,fontWeight:800,fontSize:`11px`,letterSpacing:`0.05em`}:{color:`#64748b`,fontWeight:700,fontSize:`11px`},
+                    children:day.name
+                  }),
+                  (0,R.jsx)(`div`,{
+                    className:day.isToday?`todayly-today-badge`:`todayly-normal-badge`,
+                    style:day.isToday?{backgroundColor:`#f97316`,color:`#ffffff`,border:`2px solid #ea580c`,borderRadius:`9999px`,width:`32px`,height:`32px`,display:`flex`,alignItems:`center`,justifyContent:`center`,fontWeight:700,boxShadow:`0 2px 6px rgba(234,88,12,0.3)`,margin:`4px auto 0 auto`}:{width:`32px`,height:`32px`,display:`flex`,alignItems:`center`,justifyContent:`center`,fontWeight:600,color:`#1e293b`,margin:`4px auto 0 auto`},
+                    children:day.dayNum
+                  })
+                ]
               }))
-            }),
+            ]
+          }),
 
-            // 7 Day Columns
-            weekDays.map(day=>{
-              let dayTasks=e.filter(t=>t.scheduledDate===day.dateStr||(!t.scheduledDate&&day.isToday));
-              let isCurrentDay=day.isToday;
-              let currentLineTop=Math.max(0,currentHourVal*rowHeight);
-
-              return(0,R.jsxs)(`div`,{key:day.dateStr,className:`relative border-r last:border-r-0 border-outline-variant/20 hover:bg-surface-container-lowest/50 transition-colors`,children:[
-                // Hour slot grid lines
-                hoursList.map(hr=>(0,R.jsx)(`div`,{
+          // Calendar Time Slots Grid
+          (0,R.jsxs)(`div`,{
+            className:`todayly-week-grid relative min-w-[700px]`,
+            style:{display:`grid`,gridTemplateColumns:`70px repeat(7, minmax(0, 1fr))`,width:`100%`,minWidth:`700px`,backgroundColor:`#ffffff`},
+            children:[
+              // Left Hours Column (24 rows)
+              (0,R.jsx)(`div`,{
+                className:`flex flex-col border-r border-slate-200 select-none bg-white`,
+                children:hoursList.map(hr=>(0,R.jsx)(`div`,{
                   key:hr.h,
-                  style:{height:`${rowHeight}px`},
-                  onClick:()=>h(day.dateStr,`${String(hr.h).padStart(2,'0')}:00 – ${String(hr.h+1).padStart(2,'0')}:00`),
-                  className:`border-b border-outline-variant/15 hover:bg-primary/5 cursor-pointer transition-colors`
-                })),
+                  style:{height:`${rowHeight}px`,borderBottom:`1px solid #f1f5f9`},
+                  className:`relative flex items-start justify-end pr-2 pt-0.5 text-[11px] text-slate-400 font-medium`,
+                  children:hr.label?(0,R.jsx)(`span`,{className:`relative -top-2.5`,children:hr.label}):null
+                }))
+              }),
 
-                // Red current time indicator line (for today)
-                isCurrentDay&&currentHourVal>=0&&currentHourVal<=24&&(0,R.jsxs)(`div`,{
-                  style:{top:`${currentLineTop}px`},
-                  className:`absolute left-0 right-0 flex items-center pointer-events-none z-20`,
+              // 7 Day Columns
+              weekDays.map(day=>{
+                let dayTasks=e.filter(t=>t.scheduledDate===day.dateStr||(!t.scheduledDate&&day.isToday));
+                let isCurrentDay=day.isToday;
+                let currentLineTop=Math.max(0,currentHourVal*rowHeight);
+
+                return(0,R.jsxs)(`div`,{
+                  key:day.dateStr,
+                  className:`todayly-day-col relative hover:bg-slate-50/50 transition-colors`,
+                  style:{position:`relative`,borderRight:`1px solid #e2e8f0`},
                   children:[
-                    (0,R.jsx)(`span`,{className:`w-2.5 h-2.5 rounded-full bg-red-500 -ml-1.5 shrink-0 shadow-xs`}),
-                    (0,R.jsx)(`span`,{className:`h-[2px] w-full bg-red-500`})
+                    // Hour slot grid lines
+                    hoursList.map(hr=>(0,R.jsx)(`div`,{
+                      key:hr.h,
+                      style:{height:`${rowHeight}px`,borderBottom:`1px solid #f1f5f9`},
+                      onClick:()=>h(day.dateStr,`${String(hr.h).padStart(2,'0')}:00 – ${String(hr.h+1).padStart(2,'0')}:00`),
+                      className:`todayly-hour-slot cursor-pointer transition-colors`
+                    })),
+
+                    // Red current time indicator line (for today)
+                    isCurrentDay&&currentHourVal>=0&&currentHourVal<=24&&(0,R.jsxs)(`div`,{
+                      style:{top:`${currentLineTop}px`},
+                      className:`absolute left-0 right-0 flex items-center pointer-events-none z-20`,
+                      children:[
+                        (0,R.jsx)(`span`,{style:{backgroundColor:`#ef4444`},className:`w-2.5 h-2.5 rounded-full -ml-1.5 shrink-0 shadow-xs`}),
+                        (0,R.jsx)(`span`,{style:{backgroundColor:`#ef4444`,height:`2px`},className:`w-full`})
+                      ]
+                    }),
+
+                    // Task / Activity Cards in this day
+                    dayTasks.map(task=>{
+                      let slot=parseTimeSlot(task.time);
+                      let topPx=Math.max(0,slot.startHour*rowHeight);
+                      let heightPx=Math.max(38,slot.duration*rowHeight-4);
+                      let isComp=task.completed;
+
+                      let colorClasses=isComp?`bg-slate-100 text-slate-400 border-slate-300 line-through opacity-70`:
+                        task.type===`food`?`bg-amber-50 text-amber-900 border-amber-500`:
+                        task.type===`place`?`bg-emerald-50 text-emerald-900 border-emerald-500`:
+                        `bg-indigo-50 text-indigo-900 border-indigo-600`;
+
+                      return(0,R.jsxs)(`div`,{
+                        key:task.id,
+                        style:{top:`${topPx}px`,height:`${heightPx}px`},
+                        onClick:ev=>{ev.stopPropagation();y(task)},
+                        className:`absolute left-1 right-1 rounded-xl p-2 text-xs font-semibold shadow-xs hover:shadow-md transition-all cursor-pointer overflow-hidden z-10 border-l-4 flex flex-col justify-start gap-0.5 ${colorClasses}`,
+                        title:`${task.time}: ${task.title}`,
+                        children:[
+                          (0,R.jsx)(`div`,{className:`font-bold text-[10px] leading-tight truncate`,children:task.time}),
+                          (0,R.jsx)(`div`,{className:`font-bold text-xs leading-tight truncate`,children:task.title}),
+                          task.location&&(0,R.jsxs)(`div`,{className:`text-[10px] text-slate-500 truncate opacity-90`,children:[`📍 `,task.location]})
+                        ]
+                      });
+                    })
                   ]
-                }),
-
-                // Task / Activity Cards in this day
-                dayTasks.map(task=>{
-                  let slot=parseTimeSlot(task.time);
-                  let topPx=Math.max(0,slot.startHour*rowHeight);
-                  let heightPx=Math.max(38,slot.duration*rowHeight-4);
-                  let isComp=task.completed;
-
-                  let colorClasses=isComp?`bg-surface-container-low text-outline border-outline line-through opacity-70`:
-                    task.type===`food`?`bg-secondary-fixed/50 text-secondary border-secondary`:
-                    task.type===`place`?`bg-tertiary-fixed/60 text-tertiary border-tertiary`:
-                    `bg-primary-fixed/50 text-primary border-primary`;
-
-                  return(0,R.jsxs)(`div`,{
-                    key:task.id,
-                    style:{top:`${topPx}px`,height:`${heightPx}px`},
-                    onClick:ev=>{ev.stopPropagation();y(task)},
-                    className:`absolute left-1 right-1 rounded-xl p-2 text-xs font-semibold shadow-xs hover:shadow-md transition-all cursor-pointer overflow-hidden z-10 border-l-4 flex flex-col justify-start gap-0.5 ${colorClasses}`,
-                    title:`${task.time}: ${task.title}`,
-                    children:[
-                      (0,R.jsx)(`div`,{className:`font-bold text-[10px] leading-tight truncate`,children:task.time}),
-                      (0,R.jsx)(`div`,{className:`font-bold text-xs leading-tight truncate`,children:task.title}),
-                      task.location&&(0,R.jsxs)(`div`,{className:`text-[10px] text-on-surface-variant truncate opacity-85`,children:[`📍 `,task.location]})
-                    ]
-                  });
-                })
-              ]});
-            })
-          ]
-        })
+                });
+              })
+            ]
+          })
+        ]
       })
-    ]}):(0,R.jsxs)(`section`,{className:`rounded-3xl bg-surface-container-lowest p-5 sm:p-8 shadow-sm border border-outline-variant/30 flex flex-col gap-5`,children:[
+    }):(0,R.jsxs)(`section`,{className:`rounded-3xl bg-surface-container-lowest p-5 sm:p-8 shadow-sm border border-outline-variant/30 flex flex-col gap-5`,children:[
       (0,R.jsxs)(`div`,{className:`flex items-center justify-between gap-3`,children:[
         (0,R.jsx)(`h2`,{className:`font-headline-md text-headline-md font-bold text-on-surface`,children:`Dòng Thời Gian Chi Tiết`}),
         (0,R.jsx)(`span`,{className:`font-label-md text-label-md text-on-surface-variant`,children:x})
