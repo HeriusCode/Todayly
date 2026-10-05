@@ -106,3 +106,31 @@ img[src='/todayly-logo.png'] {
   }
 }
 
+
+
+/* Weekly Schedule Task Cards (Signature Purple) */
+.todayly-week-card {
+  background-color: #ede9fe !important;
+  border: 1px solid #c7d2fe !important;
+  border-left: 4px solid #7c3aed !important;
+  color: #1e1b4b !important;
+  box-shadow: 0 2px 6px rgba(124, 58, 237, 0.15) !important;
+  border-radius: 10px !important;
+  transition: all 0.2s ease !important;
+}
+
+.todayly-week-card:hover {
+  background-color: #e0e7ff !important;
+  box-shadow: 0 4px 12px rgba(124, 58, 237, 0.25) !important;
+  transform: translateY(-1px) !important;
+}
+
+.todayly-week-card.is-completed {
+  background-color: #f1f5f9 !important;
+  border: 1px solid #e2e8f0 !important;
+  border-left: 4px solid #94a3b8 !important;
+  color: #94a3b8 !important;
+  box-shadow: none !important;
+  opacity: 0.7 !important;
+  text-decoration: line-through !important;
+}

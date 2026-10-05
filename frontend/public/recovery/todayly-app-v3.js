@@ -306,28 +306,54 @@ Please change the parent <Route path="${e}"> to <Route path="${e===`/`?`*`:`${e}
                       ]
                     }),
 
-                    // Task / Activity Cards in this day
+                    // Task / Activity Cards in this day (Signature Todayly Purple Cards)
                     dayTasks.map(task=>{
                       let slot=parseTimeSlot(task.time);
                       let topPx=Math.max(0,slot.startHour*rowHeight);
                       let heightPx=Math.max(38,slot.duration*rowHeight-4);
                       let isComp=task.completed;
 
-                      let colorClasses=isComp?`bg-slate-100 text-slate-400 border-slate-300 line-through opacity-70`:
-                        task.type===`food`?`bg-amber-50 text-amber-900 border-amber-500`:
-                        task.type===`place`?`bg-emerald-50 text-emerald-900 border-emerald-500`:
-                        `bg-indigo-50 text-indigo-900 border-indigo-600`;
+                      let cardStyle=isComp?{
+                        top:`${topPx}px`,
+                        height:`${heightPx}px`,
+                        backgroundColor:`#f1f5f9`,
+                        border:`1px solid #e2e8f0`,
+                        borderLeft:`4px solid #94a3b8`,
+                        color:`#94a3b8`,
+                        textDecoration:`line-through`,
+                        opacity:0.75
+                      }:{
+                        top:`${topPx}px`,
+                        height:`${heightPx}px`,
+                        backgroundColor:`#ede9fe`,
+                        border:`1px solid #c7d2fe`,
+                        borderLeft:`4px solid #7c3aed`,
+                        color:`#1e1b4b`,
+                        boxShadow:`0 2px 6px rgba(124, 58, 237, 0.15)`
+                      };
 
                       return(0,R.jsxs)(`div`,{
                         key:task.id,
-                        style:{top:`${topPx}px`,height:`${heightPx}px`},
+                        style:cardStyle,
                         onClick:ev=>{ev.stopPropagation();y(task)},
-                        className:`absolute left-1 right-1 rounded-xl p-2 text-xs font-semibold shadow-xs hover:shadow-md transition-all cursor-pointer overflow-hidden z-10 border-l-4 flex flex-col justify-start gap-0.5 ${colorClasses}`,
+                        className:`todayly-week-card absolute left-1 right-1 rounded-xl p-2 text-xs font-semibold hover:shadow-md transition-all cursor-pointer overflow-hidden z-10 flex flex-col justify-start gap-0.5 ${isComp?'is-completed':''}`,
                         title:`${task.time}: ${task.title}`,
                         children:[
-                          (0,R.jsx)(`div`,{className:`font-bold text-[10px] leading-tight truncate`,children:task.time}),
-                          (0,R.jsx)(`div`,{className:`font-bold text-xs leading-tight truncate`,children:task.title}),
-                          task.location&&(0,R.jsxs)(`div`,{className:`text-[10px] text-slate-500 truncate opacity-90`,children:[`📍 `,task.location]})
+                          (0,R.jsx)(`div`,{
+                            className:`font-bold text-[10px] leading-tight truncate`,
+                            style:isComp?{}:{color:`#6d28d9`,fontWeight:700},
+                            children:task.time
+                          }),
+                          (0,R.jsx)(`div`,{
+                            className:`font-bold text-xs leading-tight truncate`,
+                            style:isComp?{}:{color:`#1e1b4b`,fontWeight:700},
+                            children:task.title
+                          }),
+                          task.location&&(0,R.jsxs)(`div`,{
+                            className:`text-[10px] truncate opacity-90`,
+                            style:isComp?{}:{color:`#7c3aed`},
+                            children:[`📍 `,task.location]
+                          })
                         ]
                       });
                     })
