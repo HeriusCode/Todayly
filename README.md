@@ -81,3 +81,16 @@ npm run dev
 - `POST /api/auth/login`: Đăng nhập, trả về JWT token và thông tin cá nhân.
 - `GET /api/auth/me`: Lấy thông tin người dùng hiện tại (yêu cầu Header `Authorization: Bearer <token>`).
 - `PUT /api/auth/preferences`: Cập nhật nhịp sinh học (giờ thức dậy, giờ ngủ), khẩu vị ăn uống, phong cách trang phục, phương tiện di chuyển.
+
+---
+
+## 📝 Giai Đoạn 2: Quản Lý Công Việc & Năng Suất (Đã hoàn thiện)
+
+### Danh sách API Giai Đoạn 2:
+- `GET /api/tasks`: Lấy toàn bộ danh sách công việc từ MongoDB Atlas (hỗ trợ lọc theo `category`, `priority`, `completed`). Tự động nạp dữ liệu mẫu ban đầu nếu database trống.
+- `POST /api/tasks`: Tạo công việc mới (tiêu đề, khung giờ, độ ưu tiên, ma trận Eisenhower, mục tiêu Pomodoro).
+- `GET /api/tasks/:id`: Lấy thông tin chi tiết một công việc.
+- `PUT /api/tasks/:id`: Cập nhật nội dung công việc.
+- `PATCH /api/tasks/:id/toggle`: Đánh dấu hoàn thành / chưa hoàn thành (Optimistic Update).
+- `PATCH /api/tasks/:id/pomodoro`: Tăng số phiên Pomodoro hoàn thành.
+- `DELETE /api/tasks/:id`: Xóa công việc khỏi database.

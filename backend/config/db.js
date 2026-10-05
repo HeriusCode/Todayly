@@ -5,25 +5,18 @@ export let isConnected = false;
 const connectDB = async () => {
   const uri = process.env.MONGO_URI || '';
   if (!uri || uri.includes('<db_password>')) {
-    console.log('--------------------------------------------------');
-    console.log('ℹ️  [MongoDB Atlas]: URI đang chứa placeholder <db_password>');
-    console.log('👉 Vui lòng thay <db_password> bằng mật khẩu thật trong backend/.env');
-    console.log('⚡ [Fallback Mode]: Server kích hoạt Store dự phòng để toàn bộ API Auth/Task hoạt động thông suốt.');
-    console.log('--------------------------------------------------');
+    console.error('[MongoDB] MONGO_URI chưa hợp lệ. API ghi dữ liệu sẽ trả về 503.');
     return;
   }
 
   try {
-    const conn = await mongoose.connect(uri, {
-      serverSelectionTimeoutMS: 6000,
-    });
+    const conn = await mongoose.connect(uri, { serverSelectionTimeoutMS: 6000 });
     isConnected = true;
-    console.log('--------------------------------------------------');
-    console.log('✅ [MongoDB Atlas Connected]:', conn.connection.host);
-    console.log('--------------------------------------------------');
+    console.log(`✅ [MongoDB Atlas Connected]: ${conn.connection.host}`);
   } catch (error) {
-    console.warn('⚠️ [MongoDB Atlas Connection Failed]:', error.message);
-    console.warn('⚡ [Fallback Mode]: Tự động chuyển sang Store dự phòng.');
+    isConnected = false;
+    console.error(`[MongoDB Atlas Connection Failed]: ${error.message}`);
+    console.error('[MongoDB] Không dùng dữ liệu tạm; API ghi dữ liệu sẽ trả về 503.');
   }
 };
 

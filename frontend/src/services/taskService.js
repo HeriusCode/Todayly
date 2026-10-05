@@ -1,37 +1,33 @@
 import api from './api';
-import { mockTasks } from '../data/mockTasks';
 
 export const taskService = {
-  getAll: async () => {
-    try {
-      const res = await api.get('/tasks');
-      return (res.data && res.data.length > 0) ? res.data : mockTasks;
-    } catch {
-      return mockTasks;
-    }
+  getAll: async (params = {}) => {
+    const response = await api.get('/tasks', { params });
+    return response.data;
   },
+
   create: async (task) => {
-    try {
-      const res = await api.post('/tasks', task);
-      return res.data;
-    } catch {
-      return { id: 't-' + Date.now(), ...task, completed: false };
-    }
+    const response = await api.post('/tasks', task);
+    return response.data;
   },
+
+  update: async (id, updates) => {
+    const response = await api.put(`/tasks/${id}`, updates);
+    return response.data;
+  },
+
   toggleComplete: async (id, completed) => {
-    try {
-      const res = await api.patch(`/tasks/${id}/toggle`, { completed });
-      return res.data;
-    } catch {
-      return { id, completed };
-    }
+    const response = await api.patch(`/tasks/${id}/toggle`, { completed });
+    return response.data;
   },
+
+  incrementPomodoro: async (id) => {
+    const response = await api.patch(`/tasks/${id}/pomodoro`);
+    return response.data;
+  },
+
   delete: async (id) => {
-    try {
-      await api.delete(`/tasks/${id}`);
-      return { success: true, id };
-    } catch {
-      return { success: true, id };
-    }
-  }
+    const response = await api.delete(`/tasks/${id}`);
+    return response.data;
+  },
 };
