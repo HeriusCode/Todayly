@@ -1,96 +1,79 @@
 # Todayly – Make Today Better
 
-Nền tảng đồng hành giúp bạn bắt đầu ngày mới thảnh thơi, quản lý công việc và khám phá phong cách sống thông minh.
+Ứng dụng lập lịch và quản lý công việc full-stack, dùng React + Tailwind CSS ở frontend và Express + MongoDB ở backend.
 
----
+## Cấu trúc
 
-## 🏗 Cấu Trúc Hệ Thống (Full-Stack Architecture)
-
-Dự án được cấu trúc tách biệt hoàn toàn giữa **Frontend** và **Backend**:
-
-```
-todayly/
-├── frontend/                 # Giao diện người dùng (React, Vite, Tailwind CSS)
-│   ├── public/               # Static assets & Production bundle
-│   ├── src/                  # Mã nguồn React (Components, Pages, Services, Context)
-│   │   ├── components/       # Common, Home, Task, Food, Place, Outfit
-│   │   ├── pages/            # Home, Tasks, Food, Drinks, Places, Outfit, Planner, Profile, Login, Register
-│   │   ├── services/         # Axios API services (api.js, authService.js, taskService.js...)
-│   │   ├── context/          # React Context (AuthContext.jsx...)
-│   │   └── data/             # Mock datasets dự phòng
+```text
+Todayly/
+├── frontend/
+│   ├── public/
+│   ├── src/
+│   │   ├── assets/
+│   │   │   ├── images/
+│   │   │   └── icons/
+│   │   ├── components/
+│   │   │   ├── common/
+│   │   │   ├── layout/
+│   │   │   ├── home/
+│   │   │   ├── task/
+│   │   │   ├── food/
+│   │   │   ├── place/
+│   │   │   └── outfit/
+│   │   ├── pages/
+│   │   │   ├── Home/
+│   │   │   ├── Tasks/
+│   │   │   ├── Food/
+│   │   │   ├── Places/
+│   │   │   ├── Outfit/
+│   │   │   ├── Planner/
+│   │   │   ├── Favorites/
+│   │   │   ├── Profile/
+│   │   │   ├── Login/
+│   │   │   └── Register/
+│   │   ├── context/
+│   │   ├── data/
+│   │   ├── services/
+│   │   ├── utils/
+│   │   ├── App.jsx
+│   │   └── main.jsx
 │   ├── index.html
-│   └── package.json
-│
-├── backend/                  # RESTful API Server (Node.js, Express, Mongoose)
-│   ├── config/               # Cấu hình Database MongoDB Atlas (db.js)
-│   ├── controllers/          # Business logic (authController.js, taskController.js...)
-│   ├── middleware/           # authMiddleware (JWT), errorMiddleware
-│   ├── models/               # Mongoose Schemas (User.js, Task.js...)
-│   ├── routes/               # API routes (authRoutes.js, taskRoutes.js...)
-│   ├── .env                  # Biến môi trường & MongoDB URI
-│   ├── server.js             # Express Server entry point (Port 5000)
-│   └── package.json
-│
-└── README.md
+│   └── vite.config.js
+└── backend/
+    ├── config/
+    ├── controllers/
+    ├── middleware/
+    ├── models/
+    ├── routes/
+    └── server.js
 ```
 
----
+Frontend chạy trực tiếp từ `src/main.jsx`. Dự án không còn sử dụng production bundle khôi phục trong `public/recovery`.
 
-## ⚡ Hướng Dẫn Cài Đặt & Khởi Chạy
+## Chạy dự án
 
-### 1. Khởi động Backend (Express API)
+Backend:
 
 ```bash
 cd backend
 npm install
-npm start
-```
-- Server chạy tại: `http://localhost:5000`
-- Kiểm tra trạng thái: `http://localhost:5000/api/health`
-
-### 2. Cấu hình MongoDB Atlas
-
-Mở file `backend/.env` và cập nhật mật khẩu MongoDB của bạn:
-```env
-PORT=5000
-MONGO_URI=mongodb+srv://duy43976_db_user:<db_password>@cluster0.ro1wkuh.mongodb.net/?appName=Cluster0
-JWT_SECRET=todayly_super_secure_jwt_secret_key_2026
+npm run dev
 ```
 
-> 💡 **Cơ chế Fallback thông minh:** Nếu bạn chưa thay thế `<db_password>`, Backend sẽ tự động chuyển sang chế độ **In-Memory Store**. Toàn bộ tính năng Đăng nhập, Đăng ký, Lấy profile và Cập nhật hồ sơ đều hoạt động 100% trơn tru ngay cả khi offline!
-
-### 3. Khởi động Frontend (React + Vite)
+Frontend:
 
 ```bash
 cd frontend
 npm install
 npm run dev
 ```
-- Truy cập ứng dụng tại: `http://localhost:5173` (hoặc port do Vite cấp).
 
----
+- Frontend: `http://localhost:5173`
+- Backend health: `http://localhost:5000/api/health`
 
-## 🔑 Giai Đoạn 1: Xác Thực & Hồ Sơ Cá Nhân (Đã hoàn thiện)
+## Dữ liệu
 
-### Tài khoản mẫu thử nghiệm sẵn:
-- **Email:** `mailinh@todayly.vn`
-- **Mật khẩu:** `123456`
-
-### Danh sách API Giai Đoạn 1:
-- `POST /api/auth/register`: Đăng ký tài khoản mới (mã hóa mật khẩu bằng `bcrypt`, cấp JWT token).
-- `POST /api/auth/login`: Đăng nhập, trả về JWT token và thông tin cá nhân.
-- `GET /api/auth/me`: Lấy thông tin người dùng hiện tại (yêu cầu Header `Authorization: Bearer <token>`).
-- `PUT /api/auth/preferences`: Cập nhật nhịp sinh học (giờ thức dậy, giờ ngủ), khẩu vị ăn uống, phong cách trang phục, phương tiện di chuyển.
-
----
-
-## 📝 Giai Đoạn 2: Quản Lý Công Việc & Năng Suất (Đã hoàn thiện)
-
-### Danh sách API Giai Đoạn 2:
-- `GET /api/tasks`: Lấy toàn bộ danh sách công việc từ MongoDB Atlas (hỗ trợ lọc theo `category`, `priority`, `completed`). Tự động nạp dữ liệu mẫu ban đầu nếu database trống.
-- `POST /api/tasks`: Tạo công việc mới (tiêu đề, khung giờ, độ ưu tiên, ma trận Eisenhower, mục tiêu Pomodoro).
-- `GET /api/tasks/:id`: Lấy thông tin chi tiết một công việc.
-- `PUT /api/tasks/:id`: Cập nhật nội dung công việc.
-- `PATCH /api/tasks/:id/toggle`: Đánh dấu hoàn thành / chưa hoàn thành (Optimistic Update).
-- `PATCH /api/tasks/:id/pomodoro`: Tăng số phiên Pomodoro hoàn thành.
-- `DELETE /api/tasks/:id`: Xóa công việc khỏi database.
+- Đăng ký và đăng nhập sử dụng backend thật, không có tài khoản mẫu.
+- Công việc của mỗi người dùng được phân tách bằng JWT và lưu trong MongoDB.
+- `Lịch trình` và `Hôm nay làm gì?` dùng chung collection Task.
+- Nếu MongoDB chưa kết nối, API trả lỗi `503`; hệ thống không tạo dữ liệu giả.

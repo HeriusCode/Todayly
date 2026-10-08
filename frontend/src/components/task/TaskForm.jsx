@@ -1,0 +1,12 @@
+export default function TaskForm({ value, onChange, onSubmit, submitLabel = 'Lưu công việc' }) {
+  const set = (field) => (event) => onChange({ ...value, [field]: event.target.value });
+  return <form onSubmit={onSubmit} className="space-y-4">
+    <div><label className="field-label">Tên công việc *</label><input className="field" required value={value.title} onChange={set('title')} placeholder="Ví dụ: Hoàn thành báo cáo tuần" /></div>
+    <div className="grid gap-4 sm:grid-cols-2"><div><label className="field-label">Ngày</label><input className="field" type="date" required value={value.scheduledDate} onChange={set('scheduledDate')} /></div><div><label className="field-label">Khung giờ</label><input className="field" value={value.time} onChange={set('time')} placeholder="09:00 – 10:30" /></div></div>
+    <div className="grid gap-4 sm:grid-cols-2"><div><label className="field-label">Danh mục</label><select className="field" value={value.category} onChange={set('category')}><option>Công việc</option><option>Học tập</option><option>Cá nhân</option><option>Sức khỏe</option><option>Ăn uống</option><option>Thư giãn</option></select></div><div><label className="field-label">Mức độ ưu tiên</label><select className="field" value={value.priority} onChange={set('priority')}><option value="high">Cao</option><option value="medium">Trung bình</option><option value="low">Thấp</option></select></div></div>
+    <div><label className="field-label">Ma trận Eisenhower</label><select className="field" value={value.matrixQuadrant} onChange={set('matrixQuadrant')}><option value="important_urgent">Quan trọng & Khẩn cấp</option><option value="important_not_urgent">Quan trọng, không khẩn cấp</option><option value="not_important_urgent">Không quan trọng, khẩn cấp</option><option value="not_important_not_urgent">Không quan trọng, không khẩn cấp</option></select></div>
+    <div className="grid gap-4 sm:grid-cols-2"><div><label className="field-label">Địa điểm</label><input className="field" value={value.location} onChange={set('location')} /></div><div><label className="field-label">Mục tiêu Pomodoro</label><input className="field" type="number" min="0" value={value.pomodoroTarget} onChange={set('pomodoroTarget')} /></div></div>
+    <div><label className="field-label">Ghi chú</label><textarea className="field" rows="3" value={value.note} onChange={set('note')} /></div>
+    <div className="flex justify-end"><button className="btn-primary" type="submit">{submitLabel}</button></div>
+  </form>;
+}
