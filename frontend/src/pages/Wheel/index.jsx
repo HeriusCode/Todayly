@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { mockFoods } from '../../data/mockFoods';
+import React, { useEffect, useState } from 'react';
+import { foodService } from '../../services/foodService';
 import { mockDrinks } from '../../data/mockDrinks';
 import { mockPlaces } from '../../data/mockPlaces';
 
@@ -8,10 +8,15 @@ export default function Wheel() {
   const [spinning, setSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
   const [winner, setWinner] = useState(null);
+  const [foods, setFoods] = useState([]);
+
+  useEffect(() => {
+    foodService.getAll().then(setFoods).catch(() => setFoods([]));
+  }, []);
 
   const getItemsForMode = () => {
     if (mode === 'food') {
-      return (mockFoods || []).slice(0, 8).map((f, i) => ({
+      return foods.slice(0, 8).map((f, i) => ({
         label: f.name.split(' - ')[0],
         item: f,
         color: ['#f87171', '#fb923c', '#facc15', '#4ade80', '#2dd4bf', '#38bdf8', '#818cf8', '#c084fc'][i % 8],
@@ -33,10 +38,10 @@ export default function Wheel() {
 
   const segments = getItemsForMode();
   const numSegments = segments.length;
-  const anglePerSegment = 360 / numSegments;
+  const anglePerSegment = numSegments ? 360 / numSegments : 0;
 
   const spinWheel = () => {
-    if (spinning) return;
+    if (spinning || !numSegments) return;
     setSpinning(true);
     setWinner(null);
 
@@ -150,10 +155,10 @@ export default function Wheel() {
           <button
             type="button"
             onClick={spinWheel}
-            disabled={spinning}
+            disabled={spinning || !numSegments}
             className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 rounded-full bg-surface-container-lowest shadow-xl border-4 border-primary flex items-center justify-center font-bold text-xs uppercase text-primary hover:scale-105 active:scale-95 transition-transform z-20 cursor-pointer disabled:opacity-70"
           >
-            {spinning ? 'Đang quay...' : 'QUAY!'}
+            {spinning ? 'Đang quay...' : numSegments ? 'QUAY!' : 'Chưa có dữ liệu'}
           </button>
         </div>
 

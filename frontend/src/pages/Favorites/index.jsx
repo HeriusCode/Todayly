@@ -1,6 +1,4 @@
 import React, { useState } from 'react';
-import { mockFoods } from '../../data/mockFoods';
-import { mockDrinks } from '../../data/mockDrinks';
 import { mockPlaces } from '../../data/mockPlaces';
 import FoodCard from '../../components/food/FoodCard';
 import PlaceCard from '../../components/place/PlaceCard';
@@ -9,10 +7,8 @@ import EmptyState from '../../components/common/EmptyState';
 export default function Favorites() {
   const [activeTab, setActiveTab] = useState('all');
 
-  const savedFoods = (mockFoods || []).slice(0, 2);
+  const savedFoods = [];
   const savedPlaces = (mockPlaces || []).slice(0, 2);
-  const savedDrinks = (mockDrinks || []).slice(0, 1);
-
   return (
     <div className="w-full">
       <div className="w-full max-w-7xl mx-auto px-gutter py-8 flex flex-col gap-8">
@@ -61,11 +57,11 @@ export default function Favorites() {
               <span className="material-symbols-outlined text-secondary text-[22px]">restaurant</span>
               <h2 className="font-headline-md text-xl font-bold text-on-surface">Món Ăn Đã Lưu</h2>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {savedFoods.length ? <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
               {savedFoods.map((f) => (
                 <FoodCard key={f.id} food={f} />
               ))}
-            </div>
+            </div> : <EmptyState icon="restaurant" title="Chưa có món ăn đã lưu" description="Các món ăn sẽ chỉ xuất hiện ở đây sau khi được lưu thật vào tài khoản của bạn." />}
           </div>
         )}
 

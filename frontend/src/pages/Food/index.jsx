@@ -3,13 +3,17 @@ import {
   CalendarPlus,
   CheckCircle2,
   ChevronDown,
+  Clock3,
   CloudSun,
   Dices,
+  ExternalLink,
+  Globe2,
   Leaf,
   MapPin,
   Navigation,
   SearchX,
   Star,
+  Phone,
   Utensils,
   WalletCards,
   X,
@@ -29,19 +33,28 @@ const mealTabs = [
   ['drink', 'Đồ uống ☕'],
 ];
 
-const luckyFoods = [
-  ['🍲', 'Bún bò Huế cay nồng'],
-  ['🥖', 'Bánh mì heo quay giòn'],
-  ['🍛', 'Cơm tấm ba rọi trứng'],
-  ['🍜', 'Hủ tiếu Nam Vang khô'],
-  ['🥢', 'Bún đậu mắm tôm phố cổ'],
-  ['🥗', 'Gỏi cuốn tôm thịt'],
-  ['🍳', 'Bò né ốp la xíu mại'],
-];
-
-const MAP_IMAGE = 'https://lh3.googleusercontent.com/aida-public/AB6AXuB4hbiYrFE-ypProLzP8uM92ZuTW0PeOkPBkby-YrdkXaM4PJDD8BeQ39qim6seig06fW5jvR6pF16CVZuOwiOjN94feeVY1BWXldXGo6kWnhAqQQkPYq9P5f27GwE2GLvQEkgrULU-INXYskGZkIFb0UIg7bgXY3BGcK8M2gXBljfvz7-AiXI2CrUWoNK0T6SwfvaPJPXZSgQM7J5nQKTydVc9jxDL7yIQuKPdM_T75qikVewdkGjo';
-
 const idOf = (food) => food?.id || food?._id || food?.name;
+const mapEmbedUrl = (food) => {
+  const [lon, lat] = food?.location?.coordinates || [];
+  if (!Number.isFinite(lon) || !Number.isFinite(lat)) return '';
+  if (food?.source === 'google_places') {
+    return `https://www.google.com/maps?q=${lat},${lon}&z=16&output=embed`;
+  }
+  const delta = 0.008;
+  const bbox = [lon - delta, lat - delta, lon + delta, lat + delta].join(',');
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(bbox)}&layer=mapnik&marker=${lat},${lon}`;
+};
+const directionsUrl = (food) => {
+  const [lon, lat] = food?.location?.coordinates || [];
+  const destination = Number.isFinite(lon) && Number.isFinite(lat)
+    ? `${lat},${lon}`
+    : food?.address || food?.name || '';
+  const params = new URLSearchParams({ api: '1', destination });
+  if (food?.source === 'google_places' && food?.externalId) {
+    params.set('destination_place_id', food.externalId);
+  }
+  return `https://www.google.com/maps/dir/?${params.toString()}`;
+};
 const localDate = () => {
   const now = new Date();
   const offset = now.getTimezoneOffset() * 60000;
@@ -50,15 +63,18 @@ const localDate = () => {
 
 export default function Food() {
   const [foods, setFoods] = useState([]);
+  const [loadingFoods, setLoadingFoods] = useState(true);
+  const [foodError, setFoodError] = useState('');
   const [activeMeal, setActiveMeal] = useState('all');
-  const [criteria, setCriteria] = useState({ distance: false, price: false, rating: false, open: true });
+  const [criteria, setCriteria] = useState({ distance: false, price: false, rating: false, open: false });
   const [sortBy, setSortBy] = useState('distance');
+  const [showAllNearby, setShowAllNearby] = useState(false);
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const [weather, setWeather] = useState(null);
   const [savedIds, setSavedIds] = useState(() => new Set());
   const [randomizing, setRandomizing] = useState(false);
-  const [luckyChoice, setLuckyChoice] = useState(['🎯', 'Sẵn sàng quay?']);
-  const [history, setHistory] = useState(['Cơm tấm sườn bì', 'Mì Quảng ếch', 'Bánh mì chảo']);
+  const [luckyChoice, setLuckyChoice] = useState(null);
+  const [history, setHistory] = useState([]);
   const [selectedFood, setSelectedFood] = useState(null);
   const [toast, setToast] = useState('');
   const toastTimer = useRef(null);
@@ -71,8 +87,16 @@ export default function Food() {
 
   useEffect(() => {
     let active = true;
-    foodService.getAll().then((data) => {
-      if (active) setFoods(Array.isArray(data) ? data : []);
+    foodService.getNearbyForDevice({ radius: 8000 }).then((data) => {
+      if (!active) return;
+      setFoods(Array.isArray(data) ? data : []);
+      setFoodError('');
+    }).catch((error) => {
+      if (!active) return;
+      if (error.code === 1) setFoodError('Bạn cần cho phép truy cập vị trí để tìm quán ăn gần đây.');
+      else setFoodError(error.response?.data?.message || error.message || 'Không tải được dữ liệu quán ăn gần đây.');
+    }).finally(() => {
+      if (active) setLoadingFoods(false);
     });
     weatherService.getCurrentForDevice().then((data) => {
       if (active) setWeather(data);
@@ -91,7 +115,7 @@ export default function Food() {
       if (criteria.distance && Number(food.distanceNum ?? 99) > 2) return false;
       if (criteria.price && (Number(food.minPrice || 0) < 30000 || Number(food.minPrice || 0) > 80000)) return false;
       if (criteria.rating && Number(food.rating || 0) < 4.5) return false;
-      if (criteria.open && food.isOpen === false) return false;
+      if (criteria.open && !food.openHours) return false;
       return true;
     });
 
@@ -110,7 +134,11 @@ export default function Food() {
   const featured = featuredPool.length
     ? featuredPool[featuredIndex % featuredPool.length]
     : null;
-  const nearbyFoods = filteredFoods.filter((food) => idOf(food) !== idOf(featured)).slice(0, 4);
+  const nearbyPreview = filteredFoods.filter((food) => idOf(food) !== idOf(featured));
+  const nearbyFoods = showAllNearby ? filteredFoods : nearbyPreview.slice(0, 4);
+  const hasRatings = foods.some((food) => Number.isFinite(Number(food.rating)));
+  const hasPrices = foods.some((food) => Boolean(food.priceRange));
+  const usesGooglePlaces = foods.some((food) => food.source === 'google_places');
 
   const toggleCriterion = (name) => {
     setCriteria((current) => ({ ...current, [name]: !current[name] }));
@@ -137,21 +165,27 @@ export default function Food() {
   };
 
   const spinWheel = () => {
-    if (randomizing) return;
+    if (randomizing || !foods.length) {
+      if (!foods.length) showToast('Chưa có dữ liệu quán ăn để chọn ngẫu nhiên.');
+      return;
+    }
     setRandomizing(true);
     let count = 0;
     const interval = window.setInterval(() => {
-      setLuckyChoice(luckyFoods[Math.floor(Math.random() * luckyFoods.length)]);
+      const item = foods[Math.floor(Math.random() * foods.length)];
+      setLuckyChoice(item);
       count += 1;
       if (count < 12) return;
       window.clearInterval(interval);
-      const chosen = luckyFoods[Math.floor(Math.random() * luckyFoods.length)];
+      const chosen = foods[Math.floor(Math.random() * foods.length)];
       setLuckyChoice(chosen);
-      setHistory((current) => [chosen[1], ...current.filter((item) => item !== chosen[1])].slice(0, 4));
+      setHistory((current) => [chosen.name, ...current.filter((item) => item !== chosen.name)].slice(0, 4));
       setRandomizing(false);
-      showToast(`Gợi ý cho bạn: ${chosen[1]} ${chosen[0]}`);
+      showToast(`Gợi ý cho bạn: ${chosen.name} 🍽️`);
     }, 85);
   };
+
+  const displayedLuckyFood = luckyChoice || foods[0] || null;
 
   const addToPlanner = async (food) => {
     if (!localStorage.getItem('todayly_token')) {
@@ -214,11 +248,14 @@ export default function Food() {
           </div>
           <div className="food-criteria">
             <button type="button" className={criteria.distance ? 'active' : ''} onClick={() => toggleCriterion('distance')}><Navigation size={15} /> Khoảng cách (&lt; 2km)</button>
-            <button type="button" className={criteria.price ? 'active' : ''} onClick={() => toggleCriterion('price')}><WalletCards size={15} /> Khoảng giá (30k - 80k)</button>
-            <button type="button" className={criteria.rating ? 'active' : ''} onClick={() => toggleCriterion('rating')}><Star size={15} /> Đánh giá 4.5+ ⭐</button>
-            <button type="button" className={`open ${criteria.open ? 'active' : ''}`} onClick={() => toggleCriterion('open')}><i /> Đang mở cửa 🟢</button>
+            <button type="button" disabled={!hasPrices} title={!hasPrices ? 'Nguồn dữ liệu chưa có thông tin giá' : ''} className={criteria.price ? 'active' : ''} onClick={() => toggleCriterion('price')}><WalletCards size={15} /> Khoảng giá (30k - 80k)</button>
+            <button type="button" disabled={!hasRatings} title={!hasRatings ? 'OpenStreetMap không cung cấp điểm đánh giá' : ''} className={criteria.rating ? 'active' : ''} onClick={() => toggleCriterion('rating')}><Star size={15} /> Đánh giá 4.5+ ⭐</button>
+            <button type="button" className={`open ${criteria.open ? 'active' : ''}`} onClick={() => toggleCriterion('open')}><i /> Có giờ mở cửa</button>
           </div>
         </section>
+
+        {foodError && <div className="food-data-error"><SearchX size={18} /><span>{foodError}</span><button type="button" onClick={() => window.location.reload()}>Thử lại</button></div>}
+        {loadingFoods && <div className="food-data-loading"><span /> Đang tìm và lưu các quán ăn gần vị trí của bạn…</div>}
 
         <section className="food-discovery food-rise">
           <FeaturedFood food={featured} weather={weather} onChoose={addToPlanner} onReroll={rerollFeatured} />
@@ -227,9 +264,16 @@ export default function Food() {
             <article className="food-randomizer">
               <header><div><span>🎲</span><h2>Không biết ăn gì?</h2></div><small>May mắn</small></header>
               <p>Lưỡng lự quá lâu? Để vận may ẩm thực quyết định bữa ăn tiếp theo cho bạn trong một cái chạm!</p>
-              <div className={`food-slot ${randomizing ? 'spinning' : ''}`}><span>{luckyChoice[0]}</span><strong>{luckyChoice[1]}</strong></div>
+              <div className={`food-slot ${randomizing ? 'spinning' : ''}`} aria-live="polite">
+                {displayedLuckyFood?.image
+                  ? <img key={idOf(displayedLuckyFood)} src={displayedLuckyFood.image} alt={displayedLuckyFood.name} />
+                  : <div className="food-slot-placeholder"><Utensils size={30} /></div>}
+                <div className="food-slot-overlay" />
+                <strong>{displayedLuckyFood?.name || 'Đang tải danh sách quán ăn…'}</strong>
+                {displayedLuckyFood?.distance && <small><MapPin size={12} /> {displayedLuckyFood.distance}</small>}
+              </div>
               <button type="button" disabled={randomizing} onClick={spinWheel}><Dices size={20} /> {randomizing ? 'Đang chọn món…' : 'Chọn ngẫu nhiên cho tôi'}</button>
-              <footer><span>Đã quay gần đây:</span><div>{history.map((item) => <small key={item}>{item}</small>)}</div></footer>
+              <footer><span>Đã quay gần đây:</span><div>{history.length ? history.map((item) => <small key={item}>{item}</small>) : <small>Chưa có lượt quay</small>}</div></footer>
             </article>
 
             <article className="food-nutrition-tip">
@@ -243,7 +287,14 @@ export default function Food() {
         <section className="food-nearby food-rise">
           <header>
             <div><h2>Quán gần bạn</h2><span>{filteredFoods.length} địa điểm</span></div>
-            <label>Sắp xếp theo:<span><select value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="distance">Gần nhất</option><option value="rating">Đánh giá cao</option><option value="price">Giá thấp nhất</option></select><ChevronDown size={15} /></span></label>
+            <div className="food-nearby-header-actions">
+              {filteredFoods.length > 4 && (
+                <button type="button" className="food-view-all" onClick={() => setShowAllNearby((current) => !current)}>
+                  {showAllNearby ? 'Thu gọn' : `Xem tất cả (${filteredFoods.length})`}
+                </button>
+              )}
+              <label>Sắp xếp theo:<span><select value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="distance">Gần nhất</option><option value="rating">Đánh giá cao</option><option value="price">Giá thấp nhất</option></select><ChevronDown size={15} /></span></label>
+            </div>
           </header>
 
           {nearbyFoods.length ? (
@@ -251,8 +302,9 @@ export default function Food() {
               {nearbyFoods.map((food) => <FoodCard key={idOf(food)} food={food} saved={savedIds.has(idOf(food))} onSaveFavorite={toggleSaved} onOpenDetail={setSelectedFood} />)}
             </div>
           ) : (
-            <div className="food-empty"><SearchX size={34} /><strong>Không tìm thấy món ăn phù hợp</strong><p>Hãy bỏ bớt tiêu chí hoặc chọn một bữa ăn khác.</p><button type="button" onClick={() => { setActiveMeal('all'); setCriteria({ distance: false, price: false, rating: false, open: true }); }}>Xem tất cả món</button></div>
+            <div className="food-empty"><SearchX size={34} /><strong>{loadingFoods ? 'Đang tìm quán ăn gần bạn' : 'Không tìm thấy món ăn phù hợp'}</strong><p>{loadingFoods ? 'Dữ liệu sẽ xuất hiện ngay sau khi được đồng bộ.' : 'Hãy bỏ bớt tiêu chí hoặc chọn một bữa ăn khác.'}</p><button type="button" onClick={() => { setActiveMeal('all'); setCriteria({ distance: false, price: false, rating: false, open: false }); }}>Xem tất cả món</button></div>
           )}
+          <a className={`food-attribution ${usesGooglePlaces ? 'google' : ''}`} href={usesGooglePlaces ? 'https://maps.google.com' : 'https://www.openstreetmap.org/copyright'} target="_blank" rel="noreferrer">{usesGooglePlaces ? 'Thông tin địa điểm và hình ảnh: Google Maps' : 'Dữ liệu quán ăn © OpenStreetMap contributors · ODbL'}</a>
         </section>
       </div>
 
@@ -260,9 +312,15 @@ export default function Food() {
         <div className="food-drawer-backdrop" role="presentation" onMouseDown={() => setSelectedFood(null)}>
           <section className="food-drawer" role="dialog" aria-modal="true" aria-labelledby="food-drawer-title" onMouseDown={(event) => event.stopPropagation()}>
             <header><div><span>Thông tin địa điểm</span><h2 id="food-drawer-title">{selectedFood.name}</h2></div><button type="button" onClick={() => setSelectedFood(null)} aria-label="Đóng"><X size={20} /></button></header>
-            <div className="food-drawer-metrics"><span><Star size={17} /> {selectedFood.rating}</span><i /><span><WalletCards size={17} /> {selectedFood.priceLabel || selectedFood.priceRange}</span><i /><span><Navigation size={17} /> {selectedFood.distance}</span></div>
-            <div className="food-drawer-map"><small>Bản đồ chỉ dẫn</small><div style={{ backgroundImage: `url(${MAP_IMAGE})` }}><MapPin size={28} /></div></div>
-            <div className="food-drawer-actions"><button type="button" onClick={() => addToPlanner(selectedFood)}><CalendarPlus size={18} /> Thêm vào lịch trình hôm nay</button><button type="button" onClick={() => setSelectedFood(null)}>Đóng</button></div>
+            <div className="food-drawer-metrics"><span><Star size={17} /> {selectedFood.rating ?? 'Chưa có ĐG'}</span><i /><span><WalletCards size={17} /> {selectedFood.priceLabel || selectedFood.priceRange || 'Chưa có giá'}</span><i /><span><Navigation size={17} /> {selectedFood.distance || 'Chưa rõ'}</span></div>
+            <div className="food-drawer-details">
+              {selectedFood.address && <p><MapPin size={16} /><span><small>Địa chỉ</small>{selectedFood.address}</span></p>}
+              {selectedFood.openHours && <p><Clock3 size={16} /><span><small>Giờ hoạt động</small>{selectedFood.openHours}</span></p>}
+              {selectedFood.phone && <a href={`tel:${selectedFood.phone}`}><Phone size={16} /><span><small>Điện thoại</small>{selectedFood.phone}</span></a>}
+              {selectedFood.website && <a href={selectedFood.website} target="_blank" rel="noreferrer"><Globe2 size={16} /><span><small>Website</small>{selectedFood.website}</span><ExternalLink size={13} /></a>}
+            </div>
+            <div className="food-drawer-map"><small>Bản đồ chỉ dẫn</small>{mapEmbedUrl(selectedFood) ? <iframe title={`Bản đồ ${selectedFood.name}`} src={mapEmbedUrl(selectedFood)} loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen /> : <div><MapPin size={28} /><span>Chưa có tọa độ bản đồ</span></div>}</div>
+            <div className="food-drawer-actions"><button type="button" onClick={() => addToPlanner(selectedFood)}><CalendarPlus size={18} /> Thêm vào lịch trình hôm nay</button><a href={directionsUrl(selectedFood)} target="_blank" rel="noreferrer"><Navigation size={17} /> Dẫn đường</a><button type="button" onClick={() => setSelectedFood(null)}>Đóng</button></div>
           </section>
         </div>
       )}

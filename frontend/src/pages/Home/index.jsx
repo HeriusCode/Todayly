@@ -55,7 +55,7 @@ export default function Home() {
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
   useEffect(() => { loadWeather(); }, [loadWeather]);
-  useEffect(() => { Promise.all([foodService.getAll(), placeService.getAll(), outfitService.getAll()]).then(([foods, places, outfits]) => { setFood(foods?.[1] || foods?.[0] || null); setPlace(places?.[1] || places?.[0] || null); setOutfit(outfits?.[0] || null); }); }, []);
+  useEffect(() => { Promise.all([foodService.getAll().catch(() => []), placeService.getAll(), outfitService.getAll()]).then(([foods, places, outfits]) => { setFood(foods?.[1] || foods?.[0] || null); setPlace(places?.[1] || places?.[0] || null); setOutfit(outfits?.[0] || null); }); }, []);
 
   const openPlanner = () => isAuthenticated ? setModalOpen(true) : navigate('/login');
   const saveTask = async (values) => { setBusy(true); setMessage(''); try { await taskService.create(values); await loadTasks(); setModalOpen(false); } catch (error) { setMessage(error.response?.data?.message || 'Không thể lưu công việc.'); } finally { setBusy(false); } };

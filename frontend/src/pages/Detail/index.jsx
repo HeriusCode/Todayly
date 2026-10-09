@@ -1,16 +1,31 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { mockFoods } from '../../data/mockFoods';
+import { foodService } from '../../services/foodService';
 import { mockPlaces } from '../../data/mockPlaces';
 import { mockDrinks } from '../../data/mockDrinks';
 
 export default function Detail() {
   const { type, id } = useParams();
+  const [foodResource, setFoodResource] = useState({ id: null, item: null });
+  const staticItem = type === 'places' || type === 'place'
+    ? (mockPlaces || []).find((place) => place.id === id)
+    : (mockDrinks || []).find((drink) => drink.id === id);
+  const item = type === 'food' ? foodResource.item : staticItem;
+  const loading = type === 'food' && foodResource.id !== id;
 
-  let item = null;
-  if (type === 'food') item = (mockFoods || []).find((f) => f.id === id);
-  else if (type === 'places' || type === 'place') item = (mockPlaces || []).find((p) => p.id === id);
-  else if (type === 'drinks' || type === 'drink') item = (mockDrinks || []).find((d) => d.id === id);
+  useEffect(() => {
+    let active = true;
+    if (type === 'food') {
+      foodService.getById(id)
+        .then((data) => { if (active) setFoodResource({ id, item: data }); })
+        .catch(() => { if (active) setFoodResource({ id, item: null }); });
+    }
+    return () => { active = false; };
+  }, [id, type]);
+
+  if (loading) {
+    return <div className="w-full max-w-4xl mx-auto px-gutter py-16 text-center text-on-surface-variant">Đang tải dữ liệu quán ăn…</div>;
+  }
 
   if (!item) {
     return (
