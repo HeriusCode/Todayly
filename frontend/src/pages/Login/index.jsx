@@ -1,153 +1,59 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { ArrowRight, CalendarDays, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import AuthShowcase from '../../components/auth/AuthShowcase';
+import GoogleIcon from '../../components/auth/GoogleIcon';
 import { useAuth } from '../../context/AuthContext';
 
 export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError('');
-    setIsLoading(true);
+    setLoading(true);
     try {
       await login({ email, password });
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || 'Đăng nhập không thành công, vui lòng thử lại.');
+      setError(err.response?.data?.message || 'Đăng nhập không thành công. Vui lòng kiểm tra lại email và mật khẩu.');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="w-full flex-1 flex items-center justify-center px-gutter py-12">
-      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-        {/* Left Form Card */}
-        <div className="lg:col-span-6 bg-surface-container-lowest rounded-3xl p-6 sm:p-10 shadow-sm border border-outline-variant/30 flex flex-col gap-6">
-          <div className="flex flex-col gap-1">
-            <span className="inline-block px-3 py-1 rounded-full bg-primary-fixed text-primary font-label-sm text-xs font-bold uppercase tracking-wider w-fit">
-              Chào mừng trở lại
-            </span>
-            <h1 className="font-display-lg text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight mt-1">
-              Đăng Nhập Todayly ✨
-            </h1>
-            <p className="font-body-md text-sm text-on-surface-variant">
-              Khởi động ngày mới với kế hoạch sống thông minh và tràn đầy năng lượng.
-            </p>
-          </div>
+    <div className="auth-page">
+      <span className="auth-ambient auth-ambient-one" aria-hidden="true" />
+      <span className="auth-ambient auth-ambient-two" aria-hidden="true" />
+      <span className="auth-ambient auth-ambient-three" aria-hidden="true" />
+      <div className="auth-layout auth-login-layout">
+        <section className="auth-form-panel auth-reveal auth-reveal-left">
+          <div className="auth-brand"><span><CalendarDays size={27} /></span><div><strong>Todayly</strong><small>Make Today Better</small></div></div>
+          <header className="auth-heading"><h1>Chào mừng trở lại! ✨</h1><p>Đăng nhập để tiếp tục nhịp sống tích cực, thảnh thơi và đón nhận kế hoạch trọn vẹn từng khoảnh khắc hôm nay.</p></header>
 
-          {error && (
-            <div className="p-3.5 rounded-xl bg-error-container text-error text-xs font-semibold flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px]">error</span>
-              <span>{error}</span>
-            </div>
-          )}
+          <button type="button" className="auth-google" onClick={() => setError('Đăng nhập Google chưa được cấu hình. Vui lòng sử dụng email và mật khẩu.')}><GoogleIcon />Tiếp tục nhanh với Google<ArrowRight size={18} /></button>
+          <div className="auth-divider"><span>Hoặc tiếp tục với email</span></div>
+          {error && <div className="auth-error">{error}</div>}
 
-          <form onSubmit={handleLogin} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="font-label-md text-sm font-semibold text-on-surface">
-                Địa chỉ Email
-              </label>
-              <div className="relative flex items-center">
-                <span className="material-symbols-outlined absolute left-4 text-outline text-[20px]">
-                  mail
-                </span>
-                <input
-                  type="email"
-                  required
-                  placeholder="yourname@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-surface-container-low rounded-2xl text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/20 border border-transparent focus:border-primary transition-all"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
-                <label className="font-label-md text-sm font-semibold text-on-surface">
-                  Mật khẩu
-                </label>
-                <a href="#" className="font-label-sm text-xs text-primary font-semibold hover:underline">
-                  Quên mật khẩu?
-                </a>
-              </div>
-              <div className="relative flex items-center">
-                <span className="material-symbols-outlined absolute left-4 text-outline text-[20px]">
-                  lock
-                </span>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  required
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-11 pr-11 py-3 bg-surface-container-low rounded-2xl text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/20 border border-transparent focus:border-primary transition-all"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 text-outline hover:text-on-surface cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[20px]">
-                    {showPassword ? 'visibility_off' : 'visibility'}
-                  </span>
-                </button>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full mt-2 py-4 px-6 rounded-2xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
-            >
-              <span>{isLoading ? 'Đang xác thực...' : 'Đăng nhập vào Todayly'}</span>
-              <span className="material-symbols-outlined text-[20px]">arrow_forward</span>
-            </button>
+          <form onSubmit={handleSubmit} className="auth-form">
+            <label><span>Địa chỉ Email <small>Cá nhân hoặc công việc</small></span><div className="auth-input"><Mail size={20} /><input type="email" required autoComplete="email" placeholder="ban@example.com" value={email} onChange={(event) => setEmail(event.target.value)} /></div></label>
+            <label><span>Mật khẩu <Link to="/login">Quên mật khẩu?</Link></span><div className="auth-input"><LockKeyhole size={20} /><input type={showPassword ? 'text' : 'password'} required autoComplete="current-password" placeholder="••••••••" value={password} onChange={(event) => setPassword(event.target.value)} /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button></div></label>
+            <label className="auth-check"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /><span>Duy trì đăng nhập trên thiết bị này</span></label>
+            <button type="submit" disabled={loading} className="auth-submit">{loading ? 'Đang xác thực…' : 'Đăng nhập ngay'}<ArrowRight size={19} /></button>
           </form>
 
-          <div className="text-center pt-2 border-t border-surface-container">
-            <p className="text-xs text-on-surface-variant">
-              Chưa có tài khoản Todayly?{' '}
-              <Link to="/register" className="text-primary font-bold hover:underline">
-                Đăng ký tài khoản mới
-              </Link>
-            </p>
-          </div>
-        </div>
-
-        {/* Right Hero Image Card */}
-        <div className="lg:col-span-6 relative hidden lg:flex flex-col justify-center">
-          <div className="relative bg-surface-container-lowest rounded-3xl p-4 sm:p-7 shadow-sm border border-outline-variant/30 overflow-hidden">
-            <div className="relative w-full h-[440px] rounded-2xl overflow-hidden group">
-              <img
-                alt="Mindful living"
-                className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out"
-                src="https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&auto=format&fit=crop&q=80"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-on-surface/85 via-on-surface/30 to-transparent flex flex-col justify-end p-6 sm:p-8">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-lowest/80 backdrop-blur-md self-start mb-3">
-                  <span className="material-symbols-outlined text-primary text-[16px]">eco</span>
-                  <span className="font-label-sm text-xs text-on-surface font-bold">
-                    Lối sống tích cực
-                  </span>
-                </div>
-                <p className="font-headline-md text-lg text-white font-bold leading-snug">
-                  "Bắt đầu ngày mới với sự thảnh thơi, không còn nỗi lo 'Hôm nay ăn gì, đi đâu, làm gì'."
-                </p>
-                <span className="text-xs text-white/80 mt-1">
-                  Đồng hành cùng hơn 10.000 bạn trẻ tại Việt Nam
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+          <div className="auth-switch">Chưa có tài khoản hôm nay? <Link to="/register">Đăng ký miễn phí</Link></div>
+          <p className="auth-security"><ShieldCheck size={16} /> Bảo mật thông tin & quyền riêng tư người dùng chuẩn SSL</p>
+        </section>
+        <AuthShowcase variant="login" />
       </div>
     </div>
   );

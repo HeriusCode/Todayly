@@ -1,198 +1,63 @@
-import React, { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { CalendarDays, Eye, EyeOff, LockKeyhole, Mail, Rocket, ShieldCheck, UserRound } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import AuthShowcase from '../../components/auth/AuthShowcase';
+import GoogleIcon from '../../components/auth/GoogleIcon';
 import { useAuth } from '../../context/AuthContext';
 
 export default function Register() {
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
-    primaryInterest: 'Làm việc & Ẩm thực',
-  });
+  const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [accepted, setAccepted] = useState(true);
+  const [newsletter, setNewsletter] = useState(true);
   const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+  const update = (name) => (event) => setForm((current) => ({ ...current, [name]: event.target.value }));
+  const strength = useMemo(() => Math.min(4, [form.password.length >= 8, /[A-Z]/.test(form.password), /\d/.test(form.password), /[^A-Za-z0-9]/.test(form.password)].filter(Boolean).length), [form.password]);
 
-  const handleRegister = async (e) => {
-    e.preventDefault();
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError('');
-
-    if (formData.password !== formData.confirmPassword) {
-      setError('Mật khẩu xác nhận không khớp.');
-      return;
-    }
-
-    setIsLoading(true);
+    if (form.password !== form.confirmPassword) return setError('Mật khẩu xác nhận không khớp.');
+    if (!accepted) return setError('Bạn cần đồng ý với Điều khoản dịch vụ và Chính sách bảo mật.');
+    setLoading(true);
     try {
-      await register({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-      });
+      await register({ name: form.name, email: form.email, password: form.password });
       navigate('/');
     } catch (err) {
-      setError(err.response?.data?.message || 'Đăng ký không thành công, vui lòng thử lại.');
+      setError(err.response?.data?.message || 'Đăng ký không thành công. Vui lòng thử lại.');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="w-full flex-1 flex items-center justify-center px-gutter py-12">
-      <div className="w-full max-w-5xl grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-        {/* Left Form Card */}
-        <div className="lg:col-span-6 bg-surface-container-lowest rounded-3xl p-6 sm:p-10 shadow-sm border border-outline-variant/30 flex flex-col gap-6">
-          <div className="flex flex-col gap-1">
-            <span className="inline-block px-3 py-1 rounded-full bg-secondary-fixed text-secondary font-label-sm text-xs font-bold uppercase tracking-wider w-fit">
-              Bắt đầu hành trình
-            </span>
-            <h1 className="font-display-lg text-2xl sm:text-3xl font-extrabold text-on-surface tracking-tight mt-1">
-              Tạo Tài Khoản Mới ✨
-            </h1>
-            <p className="font-body-md text-sm text-on-surface-variant">
-              Gia nhập cộng đồng Todayly để nhận lịch trình thông minh mỗi sáng.
-            </p>
-          </div>
+    <div className="auth-page auth-register-page">
+      <span className="auth-ambient auth-ambient-one" aria-hidden="true" />
+      <span className="auth-ambient auth-ambient-two" aria-hidden="true" />
+      <span className="auth-ambient auth-ambient-three" aria-hidden="true" />
+      <div className="auth-layout auth-register-layout">
+        <section className="auth-form-panel auth-reveal auth-reveal-left">
+          <div className="auth-brand"><span><CalendarDays size={27} /></span><div><strong>Todayly</strong><small>Make Today Better</small></div></div>
+          <header className="auth-heading"><h1>Bắt đầu ngày mới trọn vẹn! ✨</h1><p>Tạo tài khoản để cùng Todayly lên lịch trình cân bằng giữa công việc, ẩm thực, dạo chơi và phong cách mỗi ngày.</p></header>
+          <button type="button" className="auth-google" onClick={() => setError('Đăng ký Google chưa được cấu hình. Vui lòng đăng ký bằng email.')}><GoogleIcon />Đăng ký nhanh với Google</button>
+          <div className="auth-divider"><span>Hoặc đăng ký bằng email</span></div>
+          {error && <div className="auth-error">{error}</div>}
 
-          {error && (
-            <div className="p-3.5 rounded-xl bg-error-container text-error text-xs font-semibold flex items-center gap-2">
-              <span className="material-symbols-outlined text-[18px]">error</span>
-              <span>{error}</span>
-            </div>
-          )}
-
-          <form onSubmit={handleRegister} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="font-label-md text-sm font-semibold text-on-surface">
-                Họ và tên của bạn *
-              </label>
-              <div className="relative flex items-center">
-                <span className="material-symbols-outlined absolute left-4 text-outline text-[20px]">
-                  person
-                </span>
-                <input
-                  type="text"
-                  required
-                  placeholder="Nguyễn Mai Linh"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  className="w-full pl-11 pr-4 py-3 bg-surface-container-low rounded-2xl text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/20 border border-transparent focus:border-primary transition-all"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="font-label-md text-sm font-semibold text-on-surface">
-                Địa chỉ Email *
-              </label>
-              <div className="relative flex items-center">
-                <span className="material-symbols-outlined absolute left-4 text-outline text-[20px]">
-                  mail
-                </span>
-                <input
-                  type="email"
-                  required
-                  placeholder="mailinh@example.com"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full pl-11 pr-4 py-3 bg-surface-container-low rounded-2xl text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/20 border border-transparent focus:border-primary transition-all"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <label className="font-label-md text-sm font-semibold text-on-surface">
-                  Mật khẩu *
-                </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-4 py-3 bg-surface-container-low rounded-2xl text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/20 border border-transparent focus:border-primary transition-all"
-                />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="font-label-md text-sm font-semibold text-on-surface">
-                  Nhập lại mật khẩu *
-                </label>
-                <input
-                  type="password"
-                  required
-                  placeholder="••••••••"
-                  value={formData.confirmPassword}
-                  onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
-                  className="w-full px-4 py-3 bg-surface-container-low rounded-2xl text-sm text-on-surface placeholder:text-outline focus:outline-none focus:ring-2 focus:ring-primary/20 border border-transparent focus:border-primary transition-all"
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="font-label-md text-sm font-semibold text-on-surface">
-                Trụ cột bạn quan tâm nhất
-              </label>
-              <select
-                value={formData.primaryInterest}
-                onChange={(e) => setFormData({ ...formData, primaryInterest: e.target.value })}
-                className="w-full px-4 py-3 bg-surface-container-low rounded-2xl text-sm text-on-surface border border-transparent focus:border-primary transition-all"
-              >
-                <option value="Làm việc & Ẩm thực">Cân bằng làm việc & ăn ngon</option>
-                <option value="Khám phá điểm hẹn">Quán cafe & Dạo mát bờ biển</option>
-                <option value="Thời trang theo thời tiết">Mặc đẹp mỗi ngày</option>
-                <option value="Quản lý thời gian">Pomodoro & Kế hoạch chi tiết</option>
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full mt-2 py-4 px-6 rounded-2xl bg-primary hover:bg-primary-container text-on-primary font-label-lg text-sm font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
-            >
-              <span>{isLoading ? 'Đang tạo tài khoản...' : 'Đăng ký ngay'}</span>
-              <span className="material-symbols-outlined text-[20px]">how_to_reg</span>
-            </button>
+          <form onSubmit={handleSubmit} className="auth-form auth-register-form">
+            <label><span>Họ và tên <small>Bắt buộc</small></span><div className="auth-input"><UserRound size={20} /><input type="text" required autoComplete="name" placeholder="Ví dụ: Nguyễn Mai Linh" value={form.name} onChange={update('name')} /></div></label>
+            <label><span>Địa chỉ Email <small>Dùng để kích hoạt</small></span><div className="auth-input"><Mail size={20} /><input type="email" required autoComplete="email" placeholder="mailinh@example.com" value={form.email} onChange={update('email')} /></div></label>
+            <div className="auth-password-row"><label><span>Mật khẩu</span><div className="auth-input"><LockKeyhole size={19} /><input type={showPassword ? 'text' : 'password'} minLength="8" required autoComplete="new-password" placeholder="Tối thiểu 8 ký tự" value={form.password} onChange={update('password')} /><button type="button" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff size={19} /> : <Eye size={19} />}</button></div></label><label><span>Xác nhận mật khẩu</span><div className="auth-input"><ShieldCheck size={19} /><input type={showPassword ? 'text' : 'password'} minLength="8" required autoComplete="new-password" placeholder="Nhập lại mật khẩu" value={form.confirmPassword} onChange={update('confirmPassword')} /></div></label></div>
+            <div className="password-strength"><div><span>Độ an toàn mật khẩu</span><strong>{strength >= 4 ? 'Mạnh' : strength >= 2 ? 'Trung bình' : 'Cần mạnh hơn'}</strong></div><div>{[1, 2, 3, 4].map((part) => <i key={part} className={part <= strength ? 'active' : ''} />)}</div></div>
+            <label className="auth-check"><input type="checkbox" checked={accepted} onChange={(event) => setAccepted(event.target.checked)} /><span>Tôi đồng ý với <a href="#terms">Điều khoản dịch vụ</a> và <a href="#privacy">Chính sách bảo mật quyền riêng tư</a> của Todayly.</span></label>
+            <label className="auth-check auth-check-orange"><input type="checkbox" checked={newsletter} onChange={(event) => setNewsletter(event.target.checked)} /><span>Nhận gợi ý lịch trình thông minh, quán ngon & outfit mỗi sáng qua email.</span></label>
+            <button type="submit" disabled={loading} className="auth-submit">{loading ? 'Đang tạo tài khoản…' : 'Tạo tài khoản ngay'}<Rocket size={19} /></button>
           </form>
-
-          <div className="text-center pt-2 border-t border-surface-container">
-            <p className="text-xs text-on-surface-variant">
-              Đã có tài khoản Todayly?{' '}
-              <Link to="/login" className="text-primary font-bold hover:underline">
-                Đăng nhập
-              </Link>
-            </p>
-          </div>
-        </div>
-
-        {/* Right Hero Image Card */}
-        <div className="lg:col-span-6 relative hidden lg:flex flex-col justify-center">
-          <div className="relative bg-surface-container-lowest rounded-3xl p-4 sm:p-7 shadow-sm border border-outline-variant/30 overflow-hidden">
-            <div className="relative w-full h-[440px] rounded-2xl overflow-hidden group">
-              <img
-                alt="Mindful living"
-                className="w-full h-full object-cover transform group-hover:scale-105 transition-transform duration-700 ease-out"
-                src="https://images.unsplash.com/photo-1506126613408-eca07ce68773?w=800&auto=format&fit=crop&q=80"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-on-surface/85 via-on-surface/30 to-transparent flex flex-col justify-end p-6 sm:p-8">
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-lowest/80 backdrop-blur-md self-start mb-3">
-                  <span className="material-symbols-outlined text-primary text-[16px]">eco</span>
-                  <span className="font-label-sm text-xs text-on-surface font-bold">
-                    Lối sống tích cực
-                  </span>
-                </div>
-                <p className="font-headline-md text-lg text-white font-bold leading-snug">
-                  "Bắt đầu ngày mới với sự thảnh thơi, không còn nỗi lo 'Hôm nay ăn gì, đi đâu, làm gì'."
-                </p>
-                <span className="text-xs text-white/80 mt-1">
-                  Đồng hành cùng hơn 10.000 bạn trẻ tại Việt Nam
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+          <div className="auth-register-bottom"><span>Đã có tài khoản hôm nay? <Link to="/login">Đăng nhập ngay →</Link></span><span><ShieldCheck size={15} /> Bảo mật chuẩn SSL</span></div>
+        </section>
+        <AuthShowcase variant="register" />
       </div>
     </div>
   );
