@@ -1,88 +1,97 @@
-import React from 'react';
+import { ArrowRight, Bookmark, CalendarPlus, Clock3, MapPin, Navigation, Star } from 'lucide-react';
 
-export default function PlaceCard({ place, isSaved, onToggleSave }) {
+const directionsUrl = (place) => {
+  const destination = Number.isFinite(Number(place.latitude)) && Number.isFinite(Number(place.longitude))
+    ? `${place.latitude},${place.longitude}`
+    : place.address || place.name;
+  return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`;
+};
+
+export default function PlaceCard({ place, isSaved, selected, onToggleSave, onSelect, onAddSchedule }) {
   return (
-    <div className="rounded-3xl bg-surface-container-lowest p-6 flex flex-col justify-between shadow-xs hover:shadow-md transition-all duration-300 group border border-outline-variant/30">
-      <div className="flex flex-col gap-4">
-        <div className="relative w-full h-56 rounded-2xl overflow-hidden bg-surface-container shadow-xs">
+    <article className={`place-result-card ${selected ? 'selected' : ''}`} onClick={() => onSelect(place)}>
+      <div className="place-result-layout">
+        <div className="place-result-photo">
           <img
-            src={place.image}
+            src={place.image || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80'}
             alt={place.name}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80';
+            }}
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-on-surface/70 via-transparent to-transparent" />
-          <div className="absolute top-3 right-3 flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onToggleSave && onToggleSave(place.id)}
-              className="w-9 h-9 rounded-full bg-surface-container-lowest/80 backdrop-blur-md flex items-center justify-center text-outline hover:text-error transition-colors cursor-pointer shadow-xs"
-              title="Lưu điểm hẹn"
-            >
-              <span
-                className={`material-symbols-outlined text-[20px] ${
-                  isSaved ? 'text-error font-filled' : ''
-                }`}
+          <span>{place.rankLabel || 'Đề xuất'}</span>
+          <small>{place.distance}</small>
+        </div>
+        <div className="place-result-content">
+          <div>
+            <div className="place-result-category">
+              <span>{place.category}</span>
+              <button
+                type="button"
+                className={isSaved ? 'saved' : ''}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onToggleSave(place.id);
+                }}
+                aria-label={isSaved ? 'Bỏ lưu địa điểm' : 'Lưu địa điểm'}
               >
-                {isSaved ? 'favorite' : 'favorite_border'}
+                <Bookmark size={19} fill={isSaved ? 'currentColor' : 'none'} />
+              </button>
+            </div>
+            <h3 style={{ color: '#0f172a', fontWeight: 800 }}>{place.name}</h3>
+            {place.address && (
+              <div style={{ fontSize: '11px', color: '#64748b', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '6px' }}>
+                <MapPin size={12} style={{ flexShrink: 0, color: '#94a3b8' }} />
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{place.address}</span>
+              </div>
+            )}
+            <div className="place-result-meta">
+              <span>
+                <Star size={15} fill="currentColor" />
+                <b>{place.rating}</b> ({place.reviewsCount})
               </span>
-            </button>
-          </div>
-          <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-white text-xs">
-            <span className="px-2.5 py-1 rounded-full bg-surface-container-lowest/80 backdrop-blur-md text-on-surface font-semibold shadow-xs">
-              {place.category}
-            </span>
-            <div className="flex items-center gap-1 bg-surface-container-lowest/80 backdrop-blur-md text-on-surface px-2.5 py-1 rounded-full font-bold shadow-xs">
-              <span className="material-symbols-outlined text-amber-500 text-[14px]">star</span>
-              <span>{place.rating}</span>
-              <span className="text-outline font-normal">({place.reviewsCount})</span>
+              <i>•</i>
+              <span>
+                <Clock3 size={15} /> {place.openHours}
+              </span>
+              <i>•</i>
+              <strong>{place.isOpen ? 'Mở cửa' : 'Đóng cửa'}</strong>
+            </div>
+            <p>{place.description}</p>
+            <div className="place-result-tags">
+              {place.tags?.slice(0, 3).map((tag) => (
+                <span key={tag}>#{tag}</span>
+              ))}
             </div>
           </div>
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          <div className="flex items-center justify-between text-xs text-outline">
-            <span>{place.distance}</span>
-            <span className="flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px]">schedule</span>
-              <span>{place.openHours}</span>
-            </span>
-          </div>
-
-          <h3 className="font-headline-sm text-base font-bold text-on-surface group-hover:text-primary transition-colors line-clamp-1">
-            {place.name}
-          </h3>
-
-          <p className="font-body-sm text-xs text-on-surface-variant line-clamp-2">
-            {place.description}
-          </p>
-
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            {place.tags?.map((tag) => (
-              <span
-                key={tag}
-                className="px-2 py-0.5 rounded-full bg-surface-container text-xs text-outline font-medium"
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
+          <footer>
+            <button
+              type="button"
+              className="place-add-plan"
+              onClick={(event) => {
+                event.stopPropagation();
+                onAddSchedule(place);
+              }}
+            >
+              <CalendarPlus size={16} /> Thêm vào lịch trình
+            </button>
+            <a href={directionsUrl(place)} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
+              <Navigation size={16} /> Chỉ đường
+            </a>
+            <button
+              type="button"
+              className="place-detail"
+              onClick={(event) => {
+                event.stopPropagation();
+                onSelect(place);
+              }}
+            >
+              <MapPin size={15} /> Chi tiết <ArrowRight size={14} />
+            </button>
+          </footer>
         </div>
       </div>
-
-      <div className="flex items-center justify-between pt-4 mt-4 border-t border-surface-container">
-        <span className="font-body-sm text-xs text-outline truncate max-w-[200px]">
-          {place.address}
-        </span>
-        <a
-          href={`https://maps.google.com/?q=${encodeURIComponent(place.address || place.name)}`}
-          target="_blank"
-          rel="noreferrer"
-          className="flex items-center gap-1 text-xs font-semibold text-primary hover:underline cursor-pointer"
-        >
-          <span>Bản đồ</span>
-          <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-        </a>
-      </div>
-    </div>
+    </article>
   );
 }
