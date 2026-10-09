@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   CalendarPlus,
+  Check,
   CheckCircle2,
   ChevronDown,
   Clock3,
@@ -11,6 +12,7 @@ import {
   Leaf,
   MapPin,
   Navigation,
+  Search,
   SearchX,
   Star,
   Phone,
@@ -18,6 +20,7 @@ import {
   WalletCards,
   X,
   ChevronRight,
+  RotateCw,
 } from 'lucide-react';
 import { foodService } from '../../services/foodService';
 import { scheduleService } from '../../services/scheduleService';
@@ -87,10 +90,15 @@ export default function Food() {
   const [loadingFoods, setLoadingFoods] = useState(true);
   const [foodError, setFoodError] = useState('');
   const [activeMeal, setActiveMeal] = useState('all');
-  const [criteria, setCriteria] = useState({ distance: false, price: false, rating: false, open: false });
+  const [criteria, setCriteria] = useState({ price: false, rating: false, open: false });
+  const [selectedRadiusLimit, setSelectedRadiusLimit] = useState(2);
+  const [radiusDropdownOpen, setRadiusDropdownOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const radiusDropdownRef = useRef(null);
   const [sortBy, setSortBy] = useState('distance');
   const [showAllNearby, setShowAllNearby] = useState(false);
-  const [visibleCount, setVisibleCount] = useState(12);
+  const [visibleCount, setVisibleCount] = useState(16);
+  const [radius, setRadius] = useState(2000);
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const [weather, setWeather] = useState(null);
   const [savedIds, setSavedIds] = useState(() => new Set());
@@ -107,18 +115,49 @@ export default function Food() {
     toastTimer.current = window.setTimeout(() => setToast(''), 2800);
   };
 
+  const loadFoods = (targetRadius = radius, forceRefresh = false) => {
+    setLoadingFoods(true);
+    setFoodError('');
+    foodService.getNearbyForDevice({ radius: targetRadius, refresh: forceRefresh })
+      .then((data) => {
+        const list = Array.isArray(data) ? data : [];
+        setFoods(list);
+        if (forceRefresh) {
+          showToast(`Đã quét và lưu ${list.length} quán ăn trong bán kính ${targetRadius / 1000}km vào database! 🍽️`);
+        }
+      })
+      .catch((error) => {
+        setFoodError(error.response?.data?.message || error.message || 'Không tải được dữ liệu quán ăn gần đây.');
+      })
+      .finally(() => {
+        setLoadingFoods(false);
+      });
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (radiusDropdownRef.current && !radiusDropdownRef.current.contains(e.target)) {
+        setRadiusDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleSelectRadius = (rVal) => {
+    setSelectedRadiusLimit(rVal);
+    setRadiusDropdownOpen(false);
+    if (typeof rVal === 'number' && rVal * 1000 > radius) {
+      setRadius(rVal * 1000);
+      loadFoods(rVal * 1000, false);
+    }
+  };
+
   useEffect(() => {
     let active = true;
-    foodService.getNearbyForDevice({ radius: 10000 }).then((data) => {
-      if (!active) return;
-      setFoods(Array.isArray(data) ? data : []);
-      setFoodError('');
-    }).catch((error) => {
-      if (!active) return;
-      setFoodError(error.response?.data?.message || error.message || 'Không tải được dữ liệu quán ăn gần đây.');
-    }).finally(() => {
-      if (active) setLoadingFoods(false);
-    });
+    loadFoods(radius, false);
 
     weatherService.getCurrentForDevice().then((data) => {
       if (active) setWeather(data);
@@ -130,15 +169,36 @@ export default function Food() {
       active = false;
       window.clearTimeout(toastTimer.current);
     };
-  }, []);
+  }, [radius]);
 
   const filteredFoods = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+
     const result = foods.filter((food) => {
       if (!matchesMeal(food, activeMeal)) return false;
-      if (criteria.distance && Number(food.distanceNum ?? 99) > 2) return false;
+
+      // Filter by selected radius
+      if (selectedRadiusLimit !== 'all' && selectedRadiusLimit !== null) {
+        const dist = Number(food.distanceNum ?? 99);
+        if (dist > Number(selectedRadiusLimit)) return false;
+      }
+
       if (criteria.price && (Number(food.minPrice || 0) < 30000 || Number(food.minPrice || 0) > 80000)) return false;
       if (criteria.rating && Number(food.rating || 0) < 4.0) return false;
       if (criteria.open && food.isOpen === false) return false;
+
+      // Filter by search query
+      if (query) {
+        const name = (food.name || '').toLowerCase();
+        const cat = (food.category || '').toLowerCase();
+        const addr = (food.address || '').toLowerCase();
+        const desc = (food.description || '').toLowerCase();
+        const cuisines = Array.isArray(food.cuisines) ? food.cuisines.join(' ').toLowerCase() : '';
+        if (!name.includes(query) && !cat.includes(query) && !addr.includes(query) && !desc.includes(query) && !cuisines.includes(query)) {
+          return false;
+        }
+      }
+
       return true;
     });
 
@@ -147,7 +207,7 @@ export default function Food() {
       if (sortBy === 'price') return Number(a.minPrice || 0) - Number(b.minPrice || 0);
       return Number(a.distanceNum ?? 99) - Number(b.distanceNum ?? 99);
     });
-  }, [activeMeal, criteria, foods, sortBy]);
+  }, [activeMeal, criteria, foods, selectedRadiusLimit, searchTerm, sortBy]);
 
   const availableFoods = filteredFoods.length ? filteredFoods : foods;
   const preferredFood = availableFoods.find((food) => food.isFeatured);
@@ -265,7 +325,7 @@ export default function Food() {
           </aside>
         </header>
 
-        <section className="food-filter-panel food-rise">
+        <section className="food-filter-panel food-rise" style={{ position: 'relative', zIndex: 60 }}>
           <div className="food-meal-tabs">
             {mealTabs.map(([value, label]) => (
               <button
@@ -282,16 +342,185 @@ export default function Food() {
               </button>
             ))}
           </div>
-          <div className="food-criteria">
-            <button type="button" className={criteria.distance ? 'active' : ''} onClick={() => toggleCriterion('distance')}><Navigation size={15} /> Khoảng cách (&lt; 2km)</button>
+          <div className="food-criteria" style={{ position: 'relative', zIndex: 65 }}>
+            <div ref={radiusDropdownRef} style={{ position: 'relative', zIndex: 70, display: 'inline-block' }}>
+              <button
+                type="button"
+                className={selectedRadiusLimit !== 'all' ? 'active' : ''}
+                onClick={() => setRadiusDropdownOpen((prev) => !prev)}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+              >
+                <Navigation size={14} />
+                <span>
+                  {selectedRadiusLimit === 'all'
+                    ? 'Khoảng cách: Tất cả'
+                    : `Khoảng cách (< ${selectedRadiusLimit}km)`}
+                </span>
+                <ChevronDown
+                  size={13}
+                  style={{
+                    transform: radiusDropdownOpen ? 'rotate(180deg)' : 'none',
+                    transition: 'transform 0.2s ease',
+                  }}
+                />
+              </button>
+
+              {radiusDropdownOpen && (
+                <div
+                  style={{
+                    position: 'absolute',
+                    bottom: 'calc(100% + 8px)',
+                    left: 0,
+                    zIndex: 9999,
+                    minWidth: '220px',
+                    background: '#ffffff',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '14px',
+                    boxShadow: '0 12px 32px rgba(0, 0, 0, 0.16), 0 4px 12px rgba(0, 0, 0, 0.08)',
+                    padding: '6px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '2px',
+                  }}
+                >
+                  <div style={{ padding: '6px 10px 4px', fontSize: '10px', fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Chọn bán kính quán ăn
+                  </div>
+                  {[
+                    { value: 1, label: '< 1 km', desc: 'Đi bộ ~10 phút' },
+                    { value: 2, label: '< 2 km', desc: 'Gần tôi (Mặc định)' },
+                    { value: 3, label: '< 3 km', desc: 'Đi xe máy ~5 phút' },
+                    { value: 5, label: '< 5 km', desc: 'Khu vực lân cận' },
+                    { value: 10, label: '< 10 km', desc: 'Toàn thành phố' },
+                    { value: 'all', label: 'Tất cả khoảng cách', desc: 'Không giới hạn bán kính' },
+                  ].map((opt) => {
+                    const isSelected = selectedRadiusLimit === opt.value;
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => handleSelectRadius(opt.value)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          width: '100%',
+                          padding: '7px 10px',
+                          borderRadius: '8px',
+                          border: 'none',
+                          background: isSelected ? '#eff4ff' : 'transparent',
+                          color: isSelected ? '#3525cd' : '#334155',
+                          cursor: 'pointer',
+                          fontSize: '12px',
+                          fontWeight: isSelected ? 700 : 500,
+                          textAlign: 'left',
+                          transition: 'background 0.15s',
+                        }}
+                        onMouseEnter={(e) => {
+                          if (!isSelected) e.currentTarget.style.background = '#f8fafc';
+                        }}
+                        onMouseLeave={(e) => {
+                          if (!isSelected) e.currentTarget.style.background = 'transparent';
+                        }}
+                      >
+                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                          <span style={{ fontSize: '12px', fontWeight: isSelected ? 700 : 600 }}>{opt.label}</span>
+                          <span style={{ fontSize: '10px', color: '#64748b', fontWeight: 400 }}>{opt.desc}</span>
+                        </div>
+                        {isSelected && <Check size={14} style={{ color: '#3525cd', marginLeft: '8px', flexShrink: 0 }} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
             <button type="button" disabled={!hasPrices} title={!hasPrices ? 'Nguồn dữ liệu chưa có thông tin giá' : ''} className={criteria.price ? 'active' : ''} onClick={() => toggleCriterion('price')}><WalletCards size={15} /> Khoảng giá (30k - 80k)</button>
             <button type="button" disabled={!hasRatings} title={!hasRatings ? 'OpenStreetMap không cung cấp điểm đánh giá' : ''} className={criteria.rating ? 'active' : ''} onClick={() => toggleCriterion('rating')}><Star size={15} /> Đánh giá 4.0+ ⭐</button>
             <button type="button" className={`open ${criteria.open ? 'active' : ''}`} onClick={() => toggleCriterion('open')}><i /> Đang mở cửa</button>
+
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <div
+                style={{
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  background: '#ffffff',
+                  border: '1px solid rgba(199, 196, 216, 0.45)',
+                  borderRadius: '99px',
+                  padding: '4px 12px 4px 10px',
+                  boxShadow: '0 2px 8px rgba(38, 44, 80, 0.04)',
+                  minWidth: '250px',
+                  transition: 'border-color 0.2s, box-shadow 0.2s',
+                }}
+              >
+                <Search size={14} style={{ color: '#94a3b8', marginRight: '6px', flexShrink: 0 }} />
+                <input
+                  type="text"
+                  placeholder="Tìm quán ăn, món ăn, địa chỉ..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  style={{
+                    border: 'none',
+                    outline: 'none',
+                    background: 'transparent',
+                    fontSize: '12px',
+                    fontWeight: 500,
+                    color: '#1e293b',
+                    width: '100%',
+                    padding: '3px 0',
+                  }}
+                />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchTerm('')}
+                    style={{
+                      border: 'none',
+                      background: 'none',
+                      padding: '2px',
+                      cursor: 'pointer',
+                      color: '#94a3b8',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                    title="Xóa tìm kiếm"
+                  >
+                    <X size={13} />
+                  </button>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => loadFoods(radius, true)}
+                disabled={loadingFoods}
+                title="Quét và làm mới danh sách quán ăn"
+                style={{
+                  background: '#fff1e8',
+                  color: '#9d4300',
+                  border: '1px solid #ffd8c2',
+                  borderRadius: '99px',
+                  padding: '6px 12px',
+                  fontSize: '11px',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '5px',
+                  boxShadow: '0 2px 6px rgba(38, 44, 80, 0.03)',
+                }}
+              >
+                <RotateCw size={13} className={loadingFoods ? 'animate-spin' : ''} />
+                <span>Làm mới</span>
+              </button>
+            </div>
           </div>
         </section>
 
-        {foodError && <div className="food-data-error"><SearchX size={18} /><span>{foodError}</span><button type="button" onClick={() => window.location.reload()}>Thử lại</button></div>}
-        {loadingFoods && <div className="food-data-loading"><span /> Đang tìm kiếm các quán ăn gần vị trí của bạn…</div>}
+        {foodError && <div className="food-data-error"><SearchX size={18} /><span>{foodError}</span><button type="button" onClick={() => loadFoods(radius, true)}>Thử lại</button></div>}
+        {loadingFoods && <div className="food-data-loading"><span /> Đang quét và lưu các quán ăn trong bán kính {radius / 1000}km vào database…</div>}
 
         <section className="food-discovery food-rise">
           <FeaturedFood food={featured} weather={weather} onChoose={addToPlanner} onReroll={rerollFeatured} />
@@ -323,11 +552,14 @@ export default function Food() {
         <section className="food-nearby food-rise">
           <header>
             <div>
-              <h2>Quán gần bạn</h2>
-              <span>Tìm thấy {filteredFoods.length} địa điểm ẩm thực quanh bạn</span>
+              <h2>Quán gần bạn {selectedRadiusLimit !== 'all' ? `(bán kính < ${selectedRadiusLimit}km)` : ''}</h2>
+              <span>
+                Tìm thấy {filteredFoods.length} địa điểm ẩm thực
+                {searchTerm ? ` khớp với "${searchTerm}"` : ' • Đã lưu vào database'}
+              </span>
             </div>
             <div className="food-nearby-header-actions">
-              {filteredFoods.length > 12 && (
+              {filteredFoods.length > 16 && (
                 <button
                   type="button"
                   className="food-view-all"
@@ -403,7 +635,9 @@ export default function Food() {
                 type="button"
                 onClick={() => {
                   setActiveMeal('all');
-                  setCriteria({ distance: false, price: false, rating: false, open: false });
+                  setSelectedRadiusLimit('all');
+                  setSearchTerm('');
+                  setCriteria({ price: false, rating: false, open: false });
                 }}
               >
                 Xem tất cả món

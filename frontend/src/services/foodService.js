@@ -31,7 +31,7 @@ export const foodService = {
     }
   },
 
-  getNearby: async ({ lat, lon, radius = 10000, refresh = false }) => {
+  getNearby: async ({ lat, lon, radius = 2000, refresh = false }) => {
     const requestKey = [Number(lat).toFixed(4), Number(lon).toFixed(4), radius, refresh].join(':');
     if (nearbyRequests.has(requestKey)) return nearbyRequests.get(requestKey);
 
@@ -47,7 +47,7 @@ export const foodService = {
     }
   },
 
-  getNearbyForDevice: async ({ radius = 10000, refresh = false } = {}) => {
+  getNearbyForDevice: async ({ radius = 2000, refresh = false } = {}) => {
     const position = await getPosition();
     return foodService.getNearby({
       lat: position.coords.latitude,

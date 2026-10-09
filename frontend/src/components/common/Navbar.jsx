@@ -8,6 +8,7 @@ const navLinks = [
   { to: '/places', label: 'Khám phá' },
   { to: '/tasks', label: 'Hôm nay làm gì?' },
   { to: '/food', label: 'Hôm nay ăn gì?' },
+  { to: '/drinks', label: 'Hôm nay uống gì?' },
   { to: '/places', label: 'Hôm nay đi đâu?' },
   { to: '/outfit', label: 'Hôm nay mặc gì?' },
   { to: '/favorites', label: 'Yêu thích' },

@@ -2,9 +2,9 @@ import mongoose from 'mongoose';
 import Food from '../models/Food.js';
 import { isConnected } from '../config/db.js';
 
-const DEFAULT_RADIUS = 10000;
+const DEFAULT_RADIUS = 2000;
 const MAX_RADIUS = 20000;
-const MAX_RESULTS = 250;
+const MAX_RESULTS = 350;
 const MIN_GOOGLE_CACHE_RESULTS = 140;
 const GOOGLE_CACHE_DAYS = 30;
 const GOOGLE_NEARBY_URL = 'https://places.googleapis.com/v1/places:searchNearby';
@@ -230,6 +230,21 @@ const fetchGooglePlacesBatch = async (area, types, rankPreference, apiKey) => {
 };
 
 const getGoogleSearchAreas = (coordinates) => {
+  const is2km = coordinates.radius <= 2500;
+  if (is2km) {
+    const step = 0.007; // ~750m
+    const offsets = [
+      [0, 0],
+      [step, 0], [-step, 0], [0, step], [0, -step],
+      [step * 0.7, step * 0.7], [-step * 0.7, step * 0.7],
+      [step * 0.7, -step * 0.7], [-step * 0.7, -step * 0.7],
+    ];
+    return offsets.map(([latOffset, lonOffset]) => ({
+      lat: coordinates.lat + latOffset,
+      lon: coordinates.lon + lonOffset,
+      radius: 1200,
+    }));
+  }
   const areaRadius = Math.min(5000, Math.max(3000, coordinates.radius * 0.5));
   const offsetMeters = Math.max(1800, coordinates.radius - areaRadius);
   const latitudeOffset = offsetMeters / 111320;
@@ -247,48 +262,33 @@ const fetchGooglePlaces = async (coordinates, baseUrl) => {
   const apiKey = process.env.GOOGLE_PLACES_API_KEY;
   if (!apiKey) return [];
 
-  // Group 1: Bữa chính, Quán cơm, Phở, Bún, Nhà hàng, Hải sản, Nướng
-  const group1Types = [
-    'restaurant',
-    'vietnamese_restaurant',
-    'asian_restaurant',
-    'seafood_restaurant',
-    'barbecue_restaurant',
-  ];
-
-  // Group 2: Bánh mì, Đồ ăn nhanh, Khu ẩm thực, Pizza
-  const group2Types = [
-    'fast_food_restaurant',
-    'sandwich_shop',
-    'meal_takeaway',
-    'food_court',
-    'pizza_restaurant',
-  ];
-
-  // Group 3: Quán ăn cự ly gần nhất (Distance rank)
-  const group3Types = [
-    'restaurant',
-    'vietnamese_restaurant',
-    'sandwich_shop',
-    'fast_food_restaurant',
-    'seafood_restaurant',
-  ];
-
-  // Group 4: Món ăn vặt, tiệm bánh ăn lót dạ, tráng miệng
-  const group4Types = [
-    'dessert_shop',
-    'bakery',
-    'ice_cream_shop',
-  ];
-
   const searchAreas = getGoogleSearchAreas(coordinates);
-  const centerArea = searchAreas[4];
-  const queries = [
-    ...searchAreas.map((area) => fetchGooglePlacesBatch(area, group1Types, 'POPULARITY', apiKey)),
-    fetchGooglePlacesBatch(centerArea, group2Types, 'POPULARITY', apiKey),
-    fetchGooglePlacesBatch({ ...centerArea, radius: Math.min(3000, centerArea.radius) }, group3Types, 'DISTANCE', apiKey),
-    fetchGooglePlacesBatch(centerArea, group4Types, 'POPULARITY', apiKey),
-  ];
+  const centerArea = searchAreas[0];
+  const is2km = coordinates.radius <= 2500;
+
+  const queries = is2km
+    ? [
+        fetchGooglePlacesBatch(centerArea, ['vietnamese_restaurant', 'noodle_restaurant'], 'POPULARITY', apiKey),
+        fetchGooglePlacesBatch(centerArea, ['vietnamese_restaurant', 'noodle_restaurant'], 'DISTANCE', apiKey),
+        fetchGooglePlacesBatch(centerArea, ['restaurant', 'asian_restaurant'], 'POPULARITY', apiKey),
+        fetchGooglePlacesBatch(centerArea, ['restaurant', 'asian_restaurant'], 'DISTANCE', apiKey),
+        fetchGooglePlacesBatch(centerArea, ['sandwich_shop', 'fast_food_restaurant', 'meal_takeaway'], 'POPULARITY', apiKey),
+        fetchGooglePlacesBatch(centerArea, ['sandwich_shop', 'fast_food_restaurant', 'meal_takeaway'], 'DISTANCE', apiKey),
+        fetchGooglePlacesBatch(centerArea, ['seafood_restaurant', 'barbecue_restaurant'], 'POPULARITY', apiKey),
+        fetchGooglePlacesBatch(centerArea, ['seafood_restaurant', 'barbecue_restaurant'], 'DISTANCE', apiKey),
+        fetchGooglePlacesBatch(centerArea, ['dessert_shop', 'bakery'], 'POPULARITY', apiKey),
+        fetchGooglePlacesBatch(centerArea, ['pizza_restaurant', 'food_court'], 'POPULARITY', apiKey),
+        ...searchAreas.slice(1).flatMap((area) => [
+          fetchGooglePlacesBatch(area, ['vietnamese_restaurant', 'restaurant', 'sandwich_shop'], 'DISTANCE', apiKey),
+          fetchGooglePlacesBatch(area, ['noodle_restaurant', 'meal_takeaway', 'seafood_restaurant'], 'DISTANCE', apiKey),
+        ]),
+      ]
+    : [
+        ...searchAreas.map((area) => fetchGooglePlacesBatch(area, ['restaurant', 'vietnamese_restaurant', 'asian_restaurant'], 'POPULARITY', apiKey)),
+        fetchGooglePlacesBatch(centerArea, ['sandwich_shop', 'fast_food_restaurant', 'meal_takeaway'], 'POPULARITY', apiKey),
+        fetchGooglePlacesBatch({ ...centerArea, radius: Math.min(3000, centerArea.radius) }, ['restaurant', 'vietnamese_restaurant', 'sandwich_shop'], 'DISTANCE', apiKey),
+        fetchGooglePlacesBatch(centerArea, ['dessert_shop', 'bakery', 'ice_cream_shop'], 'POPULARITY', apiKey),
+      ];
 
   const results = await Promise.allSettled(queries);
   const placesMap = new Map();
@@ -375,9 +375,7 @@ const savePlacesToMongo = async (places) => {
   if (!isConnected || !Array.isArray(places) || !places.length) return 0;
   try {
     const syncedAt = new Date();
-    const expiresAt = new Date(syncedAt.getTime() + GOOGLE_CACHE_DAYS * 24 * 60 * 60 * 1000);
     const ops = places
-      .slice(0, MAX_RESULTS)
       .filter((place) => Array.isArray(place.location?.coordinates) && place.location.coordinates.length === 2)
       .map((place) => {
       const coords = place.location.coordinates;
@@ -409,7 +407,7 @@ const savePlacesToMongo = async (places) => {
               rawTags: {},
               active: true,
               lastSyncedAt: syncedAt,
-              expiresAt,
+              expiresAt: null,
             },
             $setOnInsert: {
               source: 'google_places',
@@ -421,7 +419,8 @@ const savePlacesToMongo = async (places) => {
       };
     });
     if (!ops.length) return 0;
-    await Food.bulkWrite(ops, { ordered: false });
+    const result = await Food.bulkWrite(ops, { ordered: false });
+    console.log(`✅ [MongoDB Saved]: Đã lưu ${ops.length} quán ăn vào database (Mới: ${result.upsertedCount}, Cập nhật: ${result.modifiedCount})`);
     return ops.length;
   } catch (err) {
     console.error('[Food Mongo Cache Error]:', err.message);
@@ -552,10 +551,6 @@ const findNearby = ({ lat, lon, radius }) => Food.aggregate([
       query: {
         active: true,
         mealType: { $ne: 'drink' },
-        $or: [
-          { source: 'openstreetmap' },
-          { source: 'google_places', expiresAt: { $gt: new Date() } },
-        ],
       },
     },
   },
@@ -574,10 +569,6 @@ export const getFoods = async (req, res, next) => {
     const foods = await Food.find({
       active: true,
       mealType: { $ne: 'drink' },
-      $or: [
-        { source: 'openstreetmap' },
-        { source: 'google_places', expiresAt: { $gt: new Date() } },
-      ],
     })
       .sort({ lastSyncedAt: -1, name: 1 })
       .limit(MAX_RESULTS);
