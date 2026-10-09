@@ -484,8 +484,8 @@ export const getNearbyPlaces = async (req, res, next) => {
       limit = MAX_RESULTS,
     } = req.query;
 
-    const parsedLat = Number(lat || 20.9786444);
-    const parsedLon = Number(lon || lng || 105.7828063);
+    const parsedLat = Number(lat || 16.0544);
+    const parsedLon = Number(lon || lng || 108.2022);
     const parsedRadius = Math.min(MAX_RADIUS, Math.max(500, Number(radius)));
     const shouldRefresh = refresh === 'true';
 
@@ -626,8 +626,8 @@ export const getMyLocation = async (req, res) => {
   }
 
   return res.json({
-    lat: 20.9786444,
-    lon: 105.7828063,
+    lat: 16.0544,
+    lon: 108.2022,
     city: 'Hanoi',
     country: 'Vietnam',
   });

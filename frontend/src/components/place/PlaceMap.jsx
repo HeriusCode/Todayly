@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Check, ChevronDown, LocateFixed, Minus, Navigation, Plus } from 'lucide-react';
 import { loadGoogleMaps } from '../../utils/googleMaps';
 
-const FALLBACK_CENTER = { lat: 20.9786444, lng: 105.7828063 };
+const FALLBACK_CENTER = { lat: 16.0544, lng: 108.2022 };
 
 const directionsUrl = (place) => {
   const destination = Number.isFinite(Number(place?.latitude)) && Number.isFinite(Number(place?.longitude))

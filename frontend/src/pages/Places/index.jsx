@@ -87,7 +87,7 @@ export default function Places() {
   const [weather, setWeather] = useState(null);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
-  const [mapCenter, setMapCenter] = useState({ lat: 20.9786444, lng: 105.7828063 });
+  const [mapCenter, setMapCenter] = useState({ lat: 16.0544, lng: 108.2022 });
   const [usingFallbackLocation, setUsingFallbackLocation] = useState(false);
 
   // Radius state

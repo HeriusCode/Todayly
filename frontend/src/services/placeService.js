@@ -1,6 +1,7 @@
 import api from './api';
 
-const DEFAULT_COORDS = { latitude: 20.9786444, longitude: 105.7828063 }; // Hà Nội
+// GPS is preferred. This is only used when the browser/IP location is unavailable.
+const DEFAULT_COORDS = { latitude: 16.0544, longitude: 108.2022 }; // Đà Nẵng
 const nearbyRequests = new Map();
 
 let cachedPosition = null;
@@ -38,30 +39,13 @@ export const getDevicePosition = async (forceRefresh = false) => {
       cachedPosition = pos;
       return pos;
     } catch {
-      // Browser location unavailable, fall through to IP detection
+      // Browser location unavailable; use the stable app fallback below.
+      // Server/IP geolocation is intentionally not used because a deployed
+      // backend's IP represents the server region, not the user's device.
     }
   }
 
-  // 2. Try IP-based Geolocation via backend API
-  try {
-    const res = await api.get('/places/my-location', { timeout: 4000 });
-    if (res.data?.lat && res.data?.lon) {
-      const pos = {
-        coords: {
-          latitude: Number(res.data.lat),
-          longitude: Number(res.data.lon),
-        },
-        isFallback: false,
-        source: 'ip',
-      };
-      cachedPosition = pos;
-      return pos;
-    }
-  } catch {
-    // Backend IP detection unavailable
-  }
-
-  // 3. Fallback to default Hanoi coordinates
+  // Fallback to the app's default city when the user denies location access.
   const fallbackPos = {
     coords: DEFAULT_COORDS,
     isFallback: true,
