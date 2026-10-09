@@ -22,7 +22,10 @@ export default function Navbar() {
   const handleLogout = () => { logout(); setProfileOpen(false); navigate('/login'); };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+    <header
+      className="fixed top-0 left-0 right-0 shadow-[0_1px_8px_rgba(0,0,0,0.06)]"
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999, background: '#ffffff' }}
+    >
       <div className="h-20 w-full px-gutter flex items-center justify-between gap-space-md max-w-7xl mx-auto">
         <div className="flex items-center gap-space-lg">
           <Link to="/" className="flex items-center gap-space-sm cursor-pointer">
@@ -40,7 +43,23 @@ export default function Navbar() {
           <button type="button" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="p-2 rounded-full hover:bg-surface-container 2xl:hidden text-on-surface cursor-pointer" aria-label="Menu"><span className="material-symbols-outlined text-[24px]">{mobileMenuOpen ? 'close' : 'menu'}</span></button>
         </div>
       </div>
-      {mobileMenuOpen && <div className="2xl:hidden bg-surface border-t border-outline-variant/20 px-gutter py-4 flex flex-col gap-1 shadow-lg max-h-[80vh] overflow-y-auto">{navLinks.map((link, index) => <NavLink key={`${link.to}-${index}`} to={link.to} onClick={() => setMobileMenuOpen(false)} className={({ isActive }) => `px-4 py-3 rounded-xl font-label-md text-base ${isActive ? 'bg-primary text-on-primary font-bold' : 'text-on-surface hover:bg-surface-container'}`}>{link.label}</NavLink>)}</div>}
+      {mobileMenuOpen && (
+        <div
+          className="2xl:hidden border-t border-slate-200 px-gutter py-4 flex flex-col gap-1 shadow-2xl max-h-[85vh] overflow-y-auto"
+          style={{ background: '#ffffff', zIndex: 9999, position: 'relative' }}
+        >
+          {navLinks.map((link, index) => (
+            <NavLink
+              key={`${link.to}-${index}`}
+              to={link.to}
+              onClick={() => setMobileMenuOpen(false)}
+              className={({ isActive }) => `px-4 py-3 rounded-xl font-label-md text-base ${isActive ? 'bg-primary text-on-primary font-bold' : 'text-slate-800 hover:bg-slate-100'}`}
+            >
+              {link.label}
+            </NavLink>
+          ))}
+        </div>
+      )}
     </header>
   );
 }

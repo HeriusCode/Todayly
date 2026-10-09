@@ -325,7 +325,7 @@ export default function Food() {
           </aside>
         </header>
 
-        <section className="food-filter-panel food-rise" style={{ position: 'relative', zIndex: 60 }}>
+        <section className="food-filter-panel food-rise" style={{ position: 'relative', zIndex: 10 }}>
           <div className="food-meal-tabs">
             {mealTabs.map(([value, label]) => (
               <button
@@ -342,8 +342,8 @@ export default function Food() {
               </button>
             ))}
           </div>
-          <div className="food-criteria" style={{ position: 'relative', zIndex: 65 }}>
-            <div ref={radiusDropdownRef} style={{ position: 'relative', zIndex: 70, display: 'inline-block' }}>
+          <div className="food-criteria" style={{ position: 'relative' }}>
+            <div ref={radiusDropdownRef} style={{ position: 'relative', display: 'inline-block' }}>
               <button
                 type="button"
                 className={selectedRadiusLimit !== 'all' ? 'active' : ''}
@@ -371,7 +371,7 @@ export default function Food() {
                     position: 'absolute',
                     bottom: 'calc(100% + 8px)',
                     left: 0,
-                    zIndex: 9999,
+                    zIndex: 40,
                     minWidth: '220px',
                     background: '#ffffff',
                     border: '1px solid #e2e8f0',
