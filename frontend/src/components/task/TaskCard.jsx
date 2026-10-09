@@ -1,103 +1,113 @@
-import React from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, Clock3, Edit3, MapPin, MoreHorizontal, Timer, Trash2 } from 'lucide-react';
 
-export default function TaskCard({ task, onToggleComplete, onDelete }) {
-  const isDone = task.completed;
+const priorityLabels = {
+  high: 'Ưu tiên cao',
+  medium: 'Trung bình',
+  low: 'Thấp',
+};
 
-  const renderPriorityBadge = (priority) => {
-    switch (priority) {
-      case 'high':
-        return (
-          <span className="px-2.5 py-0.5 rounded-full bg-error-container/30 text-error font-label-sm text-xs font-semibold">
-            Ưu tiên cao
-          </span>
-        );
-      case 'medium':
-        return (
-          <span className="px-2.5 py-0.5 rounded-full bg-secondary-fixed/50 text-secondary font-label-sm text-xs font-semibold">
-            Trung bình
-          </span>
-        );
-      default:
-        return (
-          <span className="px-2.5 py-0.5 rounded-full bg-surface-container text-on-surface-variant font-label-sm text-xs">
-            Thấp
-          </span>
-        );
-    }
+export default function TaskCard({ task, onToggle, onEdit, onDelete }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef(null);
+  const id = task.id || task._id;
+  const completedPomo = task.pomodoroCompleted || 0;
+  const targetPomo = task.pomodoroTarget || 0;
+  const percent = targetPomo
+    ? Math.min(100, Math.round((completedPomo / targetPomo) * 100))
+    : 0;
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+
+    const closeMenu = (event) => {
+      if (event.type === 'keydown' && event.key !== 'Escape') return;
+      if (event.type === 'mousedown' && menuRef.current?.contains(event.target)) return;
+      setMenuOpen(false);
+    };
+
+    document.addEventListener('mousedown', closeMenu);
+    document.addEventListener('keydown', closeMenu);
+    return () => {
+      document.removeEventListener('mousedown', closeMenu);
+      document.removeEventListener('keydown', closeMenu);
+    };
+  }, [menuOpen]);
+
+  const editTask = () => {
+    setMenuOpen(false);
+    onEdit(task);
+  };
+
+  const deleteTask = () => {
+    setMenuOpen(false);
+    onDelete(id);
   };
 
   return (
-    <div
-      className={`p-4 sm:p-5 rounded-2xl shadow-xs transition-all duration-200 border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
-        isDone
-          ? 'bg-surface-container-low border-outline-variant/30 opacity-75'
-          : 'bg-surface-container-lowest border-outline-variant/20 hover:shadow-md'
-      }`}
-    >
-      <div className="flex items-start sm:items-center gap-4 flex-1">
-        <button
-          type="button"
-          onClick={() => onToggleComplete(task.id, !isDone)}
-          className={`mt-0.5 sm:mt-0 w-6 h-6 rounded-md flex items-center justify-center shrink-0 transition-colors cursor-pointer ${
-            isDone
-              ? 'bg-primary text-on-primary'
-              : 'bg-surface-container-high text-outline hover:bg-primary hover:text-on-primary'
-          }`}
-        >
-          <span
-            className={`material-symbols-outlined text-[16px] ${
-              isDone ? 'opacity-100' : 'opacity-0 hover:opacity-100'
-            }`}
-          >
-            check
-          </span>
-        </button>
+    <article className={`tasks-item ${task.completed ? 'completed' : ''} priority-${task.priority || 'medium'}`}>
+      <button
+        type="button"
+        className="tasks-check"
+        onClick={() => onToggle(task)}
+        aria-label={task.completed ? 'Đánh dấu chưa hoàn thành' : 'Đánh dấu hoàn thành'}
+      >
+        <Check size={16} />
+      </button>
 
-        <div className="flex flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="font-label-md text-xs sm:text-sm text-on-surface-variant font-medium">
-              {task.time || `${task.startTime || ''} – ${task.endTime || ''}`}
+      <div className="tasks-item-content">
+        <div className="tasks-item-top">
+          <div>
+            <span className="tasks-time">
+              <Clock3 size={14} /> {task.startTime || '09:00'} – {task.endTime || '10:00'}
             </span>
-            <span className="px-2 py-0.5 rounded-full bg-surface-container text-primary font-label-sm text-xs font-semibold">
-              {task.category || 'Công việc'}
+            <span className={`tasks-priority ${task.priority || 'medium'}`}>
+              {priorityLabels[task.priority] || priorityLabels.medium}
             </span>
-            {renderPriorityBadge(task.priority)}
+            <span className="tasks-category">{task.category || 'Công việc'}</span>
           </div>
-          <h3
-            className={`font-headline-sm text-base text-on-surface font-semibold ${
-              isDone ? 'line-through text-outline' : ''
-            }`}
-          >
-            {task.title}
-          </h3>
-          <div className="flex flex-wrap items-center gap-3 text-body-sm text-on-surface-variant text-xs">
-            {task.location && (
-              <span className="flex items-center gap-1">
-                <span className="material-symbols-outlined text-[14px]">location_on</span>
-                {task.location}
-              </span>
-            )}
-            {task.note && <span>{task.note}</span>}
-            {task.pomodoroTarget > 0 && (
-              <span className="flex items-center gap-1 text-secondary font-semibold">
-                <span className="material-symbols-outlined text-[14px]">timer</span>
-                {task.pomodoroCompleted || 0}/{task.pomodoroTarget} Pomo
-              </span>
+
+          <div className="tasks-menu-wrap" ref={menuRef}>
+            <button
+              type="button"
+              className={`tasks-more ${menuOpen ? 'active' : ''}`}
+              onClick={() => setMenuOpen((open) => !open)}
+              aria-label="Mở thao tác công việc"
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+            >
+              <MoreHorizontal size={19} />
+            </button>
+
+            {menuOpen && (
+              <div className="tasks-item-menu" role="menu">
+                <button type="button" role="menuitem" onClick={editTask}>
+                  <Edit3 size={15} />
+                  <span>Sửa công việc</span>
+                </button>
+                <button type="button" role="menuitem" className="danger" onClick={deleteTask}>
+                  <Trash2 size={15} />
+                  <span>Xóa công việc</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
-      </div>
 
-      <div className="flex items-center gap-2 self-end sm:self-center">
-        <button
-          type="button"
-          onClick={() => onDelete(task.id)}
-          className="p-2 rounded-full hover:bg-error-container/30 text-outline hover:text-error transition-colors cursor-pointer"
-          title="Xóa công việc"
-        >
-          <span className="material-symbols-outlined text-[18px]">delete</span>
-        </button>
+        <h3>{task.title}</h3>
+
+        <div className="tasks-meta">
+          {task.location && <span><MapPin size={14} />{task.location}</span>}
+          {task.note && <span>{task.note}</span>}
+        </div>
+
+        {targetPomo > 0 && (
+          <div className="tasks-pomo-progress">
+            <span><Timer size={14} /> Pomodoro {completedPomo}/{targetPomo}</span>
+            <i><b style={{ width: `${percent}%` }} /></i>
+          </div>
+        )}
       </div>
-    </div>
+    </article>
   );
 }

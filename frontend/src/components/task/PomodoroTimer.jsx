@@ -1,92 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { Pause, Play, RotateCcw, Timer } from 'lucide-react';
 
-export default function PomodoroTimer() {
-  const [timeLeft, setTimeLeft] = useState(1500); // 25 minutes
-  const [isRunning, setIsRunning] = useState(false);
-  const [sessionsCompleted, setSessionsCompleted] = useState(2);
-
-  useEffect(() => {
-    let timer = null;
-    if (isRunning && timeLeft > 0) {
-      timer = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    } else if (timeLeft === 0) {
-      setIsRunning(false);
-      setSessionsCompleted((prev) => prev + 1);
-      alert('🎉 Chúc mừng! Bạn đã hoàn thành 1 phiên Pomodoro tập trung.');
-      setTimeLeft(1500);
-    }
-    return () => clearInterval(timer);
-  }, [isRunning, timeLeft]);
-
-  const toggleTimer = () => setIsRunning(!isRunning);
-
-  const resetTimer = () => {
-    setIsRunning(false);
-    setTimeLeft(1500);
-  };
-
-  const minutes = Math.floor(timeLeft / 60);
-  const seconds = timeLeft % 60;
-  const formattedTime = `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  const progressPercent = ((1500 - timeLeft) / 1500) * 100;
-
-  return (
-    <div className="bg-surface-container-lowest p-6 rounded-3xl shadow-sm flex flex-col gap-4 border border-outline-variant/30">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-secondary-fixed/50 text-secondary flex items-center justify-center">
-            <span className="material-symbols-outlined text-[18px]">timer</span>
-          </div>
-          <span className="font-headline-sm text-base text-on-surface font-bold">
-            Pomodoro Tập Trung
-          </span>
-        </div>
-        <span className="font-label-sm text-xs px-2.5 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed font-bold">
-          {sessionsCompleted} phiên hôm nay
-        </span>
-      </div>
-
-      <div className="flex flex-col items-center justify-center py-4 relative">
-        <div className="text-5xl font-extrabold tracking-tight text-on-surface font-mono">
-          {formattedTime}
-        </div>
-        <span className="font-label-md text-xs sm:text-sm text-on-surface-variant mt-1">
-          {isRunning ? 'Đang tập trung sâu... 🎧' : 'Sẵn sàng cho phiên mới ✨'}
-        </span>
-        <div className="w-48 h-2 rounded-full bg-surface-container-high mt-4 overflow-hidden">
-          <div
-            className="h-full bg-primary transition-all duration-300"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="flex items-center justify-center gap-3">
-        <button
-          type="button"
-          onClick={toggleTimer}
-          className={`flex items-center gap-2 px-5 py-2.5 rounded-full font-label-md text-sm font-semibold transition-all shadow-sm cursor-pointer ${
-            isRunning
-              ? 'bg-secondary-container text-on-secondary hover:bg-secondary'
-              : 'bg-primary text-on-primary hover:bg-primary-container'
-          }`}
-        >
-          <span className="material-symbols-outlined text-[18px]">
-            {isRunning ? 'pause' : 'play_arrow'}
-          </span>
-          <span>{isRunning ? 'Tạm dừng' : 'Bắt đầu 25p'}</span>
-        </button>
-        <button
-          type="button"
-          onClick={resetTimer}
-          className="p-2.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface-variant transition-colors cursor-pointer"
-          title="Đặt lại"
-        >
-          <span className="material-symbols-outlined text-[18px]">replay</span>
-        </button>
-      </div>
-    </div>
-  );
+export default function PomodoroTimer({ tasks = [], onSessionComplete }) {
+  const [secondsLeft, setSecondsLeft] = useState(25 * 60);
+  const [running, setRunning] = useState(false);
+  const [selectedId, setSelectedId] = useState('');
+  const selected = tasks.find((task) => (task.id || task._id) === selectedId) || tasks.find((task) => !task.completed);
+  useEffect(() => { if (!running) return undefined; const timer = window.setInterval(() => setSecondsLeft((current) => current > 0 ? current - 1 : 0), 1000); return () => window.clearInterval(timer); }, [running]);
+  useEffect(() => { if (secondsLeft !== 0) return; setRunning(false); setSecondsLeft(25 * 60); if (selected) onSessionComplete?.(selected); }, [secondsLeft, selected, onSessionComplete]);
+  const minutes = String(Math.floor(secondsLeft / 60)).padStart(2, '0');
+  const seconds = String(secondsLeft % 60).padStart(2, '0');
+  const progress = ((25 * 60 - secondsLeft) / (25 * 60)) * 100;
+  return <section className="tasks-focus-card"><header><span><Timer size={19} /></span><div><h2>Bộ đếm tập trung</h2><p>Pomodoro 25 phút</p></div></header><div className="tasks-focus-tabs"><button className="active">Tập trung</button><button>Nghỉ ngắn</button><button>Nghỉ dài</button></div><div className="tasks-clock" style={{ '--focus-progress': `${progress * 3.6}deg` }}><div><strong>{minutes}:{seconds}</strong><span>{running ? 'Đang tập trung sâu' : 'Sẵn sàng bắt đầu'}</span></div></div><label className="tasks-linked-task">Công việc đang tập trung<select value={selected?.id || selected?._id || ''} onChange={(event) => setSelectedId(event.target.value)}><option value="">Chọn công việc</option>{tasks.filter((task) => !task.completed).map((task) => <option value={task.id || task._id} key={task.id || task._id}>{task.title}</option>)}</select></label><div className="tasks-focus-actions"><button onClick={() => setRunning(!running)}>{running ? <Pause size={18} /> : <Play size={18} />}{running ? 'Tạm dừng' : 'Bắt đầu 25p'}</button><button onClick={() => { setRunning(false); setSecondsLeft(25 * 60); }} aria-label="Đặt lại"><RotateCcw size={18} /></button></div></section>;
 }
