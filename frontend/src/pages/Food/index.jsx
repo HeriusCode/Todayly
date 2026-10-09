@@ -17,6 +17,7 @@ import {
   Utensils,
   WalletCards,
   X,
+  ChevronRight,
 } from 'lucide-react';
 import { foodService } from '../../services/foodService';
 import { scheduleService } from '../../services/scheduleService';
@@ -25,12 +26,11 @@ import FoodCard from '../../components/food/FoodCard';
 import FeaturedFood from '../../components/food/FeaturedFood';
 
 const mealTabs = [
-  ['all', 'Tất cả'],
+  ['all', 'Tất cả món'],
   ['breakfast', 'Ăn sáng 🍳'],
   ['lunch', 'Ăn trưa 🍜'],
   ['dinner', 'Ăn tối 🍲'],
-  ['snack', 'Ăn vặt 🧋'],
-  ['drink', 'Đồ uống ☕'],
+  ['snack', 'Ăn vặt 🥟'],
 ];
 
 const idOf = (food) => food?.id || food?._id || food?.name;
@@ -61,6 +61,27 @@ const localDate = () => {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 };
 
+const matchesMeal = (food, meal) => {
+  if (meal === 'all') return true;
+  if (Array.isArray(food.mealTypes) && food.mealTypes.includes(meal)) return true;
+  if (food.mealType === meal) return true;
+
+  const desc = `${food.category || ''} ${food.name || ''} ${food.description || ''}`.toLowerCase();
+  if (meal === 'breakfast' && /phở|bún|bánh mì|xôi|cháo|miến|hủ tiếu|điểm tâm/i.test(desc)) {
+    return true;
+  }
+  if (meal === 'lunch' && (food.mealType === 'dinner' || /quán|nhà hàng|cơm|bún|phở|lẩu|mì|gà|bò/i.test(desc))) {
+    return true;
+  }
+  if (meal === 'dinner' && (food.mealType === 'lunch' || /quán|nhà hàng|cơm|lẩu|nướng|hải sản|bò|gà|bún|phở/i.test(desc))) {
+    return true;
+  }
+  if (meal === 'snack' && /chè|kem|bánh|ốc|ăn vặt|nem/i.test(desc)) {
+    return true;
+  }
+  return false;
+};
+
 export default function Food() {
   const [foods, setFoods] = useState([]);
   const [loadingFoods, setLoadingFoods] = useState(true);
@@ -69,6 +90,7 @@ export default function Food() {
   const [criteria, setCriteria] = useState({ distance: false, price: false, rating: false, open: false });
   const [sortBy, setSortBy] = useState('distance');
   const [showAllNearby, setShowAllNearby] = useState(false);
+  const [visibleCount, setVisibleCount] = useState(12);
   const [featuredIndex, setFeaturedIndex] = useState(0);
   const [weather, setWeather] = useState(null);
   const [savedIds, setSavedIds] = useState(() => new Set());
@@ -87,22 +109,23 @@ export default function Food() {
 
   useEffect(() => {
     let active = true;
-    foodService.getNearbyForDevice({ radius: 8000 }).then((data) => {
+    foodService.getNearbyForDevice({ radius: 10000 }).then((data) => {
       if (!active) return;
       setFoods(Array.isArray(data) ? data : []);
       setFoodError('');
     }).catch((error) => {
       if (!active) return;
-      if (error.code === 1) setFoodError('Bạn cần cho phép truy cập vị trí để tìm quán ăn gần đây.');
-      else setFoodError(error.response?.data?.message || error.message || 'Không tải được dữ liệu quán ăn gần đây.');
+      setFoodError(error.response?.data?.message || error.message || 'Không tải được dữ liệu quán ăn gần đây.');
     }).finally(() => {
       if (active) setLoadingFoods(false);
     });
+
     weatherService.getCurrentForDevice().then((data) => {
       if (active) setWeather(data);
     }).catch(() => {
       if (active) setWeather(null);
     });
+
     return () => {
       active = false;
       window.clearTimeout(toastTimer.current);
@@ -111,11 +134,11 @@ export default function Food() {
 
   const filteredFoods = useMemo(() => {
     const result = foods.filter((food) => {
-      if (activeMeal !== 'all' && food.mealType !== activeMeal) return false;
+      if (!matchesMeal(food, activeMeal)) return false;
       if (criteria.distance && Number(food.distanceNum ?? 99) > 2) return false;
       if (criteria.price && (Number(food.minPrice || 0) < 30000 || Number(food.minPrice || 0) > 80000)) return false;
-      if (criteria.rating && Number(food.rating || 0) < 4.5) return false;
-      if (criteria.open && !food.openHours) return false;
+      if (criteria.rating && Number(food.rating || 0) < 4.0) return false;
+      if (criteria.open && food.isOpen === false) return false;
       return true;
     });
 
@@ -134,8 +157,10 @@ export default function Food() {
   const featured = featuredPool.length
     ? featuredPool[featuredIndex % featuredPool.length]
     : null;
+
   const nearbyPreview = filteredFoods.filter((food) => idOf(food) !== idOf(featured));
-  const nearbyFoods = showAllNearby ? filteredFoods : nearbyPreview.slice(0, 4);
+  const nearbyFoods = showAllNearby ? nearbyPreview : nearbyPreview.slice(0, visibleCount);
+
   const hasRatings = foods.some((food) => Number.isFinite(Number(food.rating)));
   const hasPrices = foods.some((food) => Boolean(food.priceRange));
   const usesGooglePlaces = foods.some((food) => food.source === 'google_places');
@@ -243,19 +268,30 @@ export default function Food() {
         <section className="food-filter-panel food-rise">
           <div className="food-meal-tabs">
             {mealTabs.map(([value, label]) => (
-              <button type="button" key={value} className={activeMeal === value ? 'active' : ''} onClick={() => { setActiveMeal(value); setFeaturedIndex(0); }}>{label}</button>
+              <button
+                type="button"
+                key={value}
+                className={activeMeal === value ? 'active' : ''}
+                onClick={() => {
+                  setActiveMeal(value);
+                  setFeaturedIndex(0);
+                  setVisibleCount(12);
+                }}
+              >
+                {label}
+              </button>
             ))}
           </div>
           <div className="food-criteria">
             <button type="button" className={criteria.distance ? 'active' : ''} onClick={() => toggleCriterion('distance')}><Navigation size={15} /> Khoảng cách (&lt; 2km)</button>
             <button type="button" disabled={!hasPrices} title={!hasPrices ? 'Nguồn dữ liệu chưa có thông tin giá' : ''} className={criteria.price ? 'active' : ''} onClick={() => toggleCriterion('price')}><WalletCards size={15} /> Khoảng giá (30k - 80k)</button>
-            <button type="button" disabled={!hasRatings} title={!hasRatings ? 'OpenStreetMap không cung cấp điểm đánh giá' : ''} className={criteria.rating ? 'active' : ''} onClick={() => toggleCriterion('rating')}><Star size={15} /> Đánh giá 4.5+ ⭐</button>
-            <button type="button" className={`open ${criteria.open ? 'active' : ''}`} onClick={() => toggleCriterion('open')}><i /> Có giờ mở cửa</button>
+            <button type="button" disabled={!hasRatings} title={!hasRatings ? 'OpenStreetMap không cung cấp điểm đánh giá' : ''} className={criteria.rating ? 'active' : ''} onClick={() => toggleCriterion('rating')}><Star size={15} /> Đánh giá 4.0+ ⭐</button>
+            <button type="button" className={`open ${criteria.open ? 'active' : ''}`} onClick={() => toggleCriterion('open')}><i /> Đang mở cửa</button>
           </div>
         </section>
 
         {foodError && <div className="food-data-error"><SearchX size={18} /><span>{foodError}</span><button type="button" onClick={() => window.location.reload()}>Thử lại</button></div>}
-        {loadingFoods && <div className="food-data-loading"><span /> Đang tìm và lưu các quán ăn gần vị trí của bạn…</div>}
+        {loadingFoods && <div className="food-data-loading"><span /> Đang tìm kiếm các quán ăn gần vị trí của bạn…</div>}
 
         <section className="food-discovery food-rise">
           <FeaturedFood food={featured} weather={weather} onChoose={addToPlanner} onReroll={rerollFeatured} />
@@ -286,11 +322,18 @@ export default function Food() {
 
         <section className="food-nearby food-rise">
           <header>
-            <div><h2>Quán gần bạn</h2><span>{filteredFoods.length} địa điểm</span></div>
+            <div>
+              <h2>Quán gần bạn</h2>
+              <span>Tìm thấy {filteredFoods.length} địa điểm ẩm thực quanh bạn</span>
+            </div>
             <div className="food-nearby-header-actions">
-              {filteredFoods.length > 4 && (
-                <button type="button" className="food-view-all" onClick={() => setShowAllNearby((current) => !current)}>
-                  {showAllNearby ? 'Thu gọn' : `Xem tất cả (${filteredFoods.length})`}
+              {filteredFoods.length > 12 && (
+                <button
+                  type="button"
+                  className="food-view-all"
+                  onClick={() => setShowAllNearby((current) => !current)}
+                >
+                  {showAllNearby ? 'Thu gọn bớt' : `Xem tất cả (${filteredFoods.length})`}
                 </button>
               )}
               <label>Sắp xếp theo:<span><select value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="distance">Gần nhất</option><option value="rating">Đánh giá cao</option><option value="price">Giá thấp nhất</option></select><ChevronDown size={15} /></span></label>
@@ -298,13 +341,76 @@ export default function Food() {
           </header>
 
           {nearbyFoods.length ? (
-            <div className="food-nearby-grid">
-              {nearbyFoods.map((food) => <FoodCard key={idOf(food)} food={food} saved={savedIds.has(idOf(food))} onSaveFavorite={toggleSaved} onOpenDetail={setSelectedFood} />)}
-            </div>
+            <>
+              <div className="food-nearby-grid">
+                {nearbyFoods.map((food) => (
+                  <FoodCard
+                    key={idOf(food)}
+                    food={food}
+                    saved={savedIds.has(idOf(food))}
+                    onSaveFavorite={toggleSaved}
+                    onOpenDetail={setSelectedFood}
+                  />
+                ))}
+              </div>
+
+              {nearbyPreview.length > visibleCount && !showAllNearby && (
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '12px', marginTop: '32px' }}>
+                  <button
+                    type="button"
+                    style={{
+                      background: '#fff1e8',
+                      color: '#9d4300',
+                      border: '1px solid #ffd8c2',
+                      borderRadius: '99px',
+                      padding: '12px 24px',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                    }}
+                    onClick={() => setVisibleCount((prev) => prev + 12)}
+                  >
+                    Xem thêm (+{Math.min(12, nearbyPreview.length - visibleCount)} quán) <ChevronRight size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    style={{
+                      background: '#eff4ff',
+                      color: '#3525cd',
+                      border: '1px solid #d3e4fe',
+                      borderRadius: '99px',
+                      padding: '12px 24px',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setShowAllNearby(true)}
+                  >
+                    Xem tất cả ({nearbyPreview.length} quán)
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
-            <div className="food-empty"><SearchX size={34} /><strong>{loadingFoods ? 'Đang tìm quán ăn gần bạn' : 'Không tìm thấy món ăn phù hợp'}</strong><p>{loadingFoods ? 'Dữ liệu sẽ xuất hiện ngay sau khi được đồng bộ.' : 'Hãy bỏ bớt tiêu chí hoặc chọn một bữa ăn khác.'}</p><button type="button" onClick={() => { setActiveMeal('all'); setCriteria({ distance: false, price: false, rating: false, open: false }); }}>Xem tất cả món</button></div>
+            <div className="food-empty">
+              <SearchX size={34} />
+              <strong>{loadingFoods ? 'Đang tìm quán ăn gần bạn' : 'Không tìm thấy quán ăn phù hợp'}</strong>
+              <p>{loadingFoods ? 'Dữ liệu sẽ xuất hiện ngay sau khi được đồng bộ.' : 'Hãy bỏ bớt bộ lọc hoặc chọn mục Tất cả để xem toàn bộ quán.'}</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveMeal('all');
+                  setCriteria({ distance: false, price: false, rating: false, open: false });
+                }}
+              >
+                Xem tất cả món
+              </button>
+            </div>
           )}
-          <a className={`food-attribution ${usesGooglePlaces ? 'google' : ''}`} href={usesGooglePlaces ? 'https://maps.google.com' : 'https://www.openstreetmap.org/copyright'} target="_blank" rel="noreferrer">{usesGooglePlaces ? 'Thông tin địa điểm và hình ảnh: Google Maps' : 'Dữ liệu quán ăn © OpenStreetMap contributors · ODbL'}</a>
+          <a className={`food-attribution ${usesGooglePlaces ? 'google' : ''}`} href={usesGooglePlaces ? 'https://maps.google.com' : 'https://www.openstreetmap.org/copyright'} target="_blank" rel="noreferrer">{usesGooglePlaces ? 'Dữ liệu địa điểm và đánh giá từ Google Maps' : 'Dữ liệu quán ăn © OpenStreetMap contributors · ODbL'}</a>
         </section>
       </div>
 

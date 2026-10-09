@@ -2,57 +2,137 @@ import mongoose from 'mongoose';
 import Food from '../models/Food.js';
 import { isConnected } from '../config/db.js';
 
-const DEFAULT_RADIUS = 8000;
-const MAX_RADIUS = 15000;
-const MAX_RESULTS = 100;
+const DEFAULT_RADIUS = 10000;
+const MAX_RADIUS = 20000;
+const MAX_RESULTS = 250;
+const MIN_GOOGLE_CACHE_RESULTS = 140;
+const GOOGLE_CACHE_DAYS = 30;
 const GOOGLE_NEARBY_URL = 'https://places.googleapis.com/v1/places:searchNearby';
+
 const OVERPASS_ENDPOINTS = [
   process.env.OVERPASS_URL,
   'https://overpass-api.de/api/interpreter',
-  'https://maps.mail.ru/osm/tools/overpass/api/interpreter',
+  'https://lz4.overpass-api.de/api/interpreter',
+  'https://overpass.kumi.systems/api/interpreter',
   'https://overpass.private.coffee/api/interpreter',
 ].filter((value, index, values) => value && values.indexOf(value) === index);
 
-const cuisineLabels = {
-  vietnamese: 'Món Việt',
-  regional: 'Đặc sản địa phương',
-  noodle: 'Món sợi',
-  noodles: 'Món sợi',
-  seafood: 'Hải sản',
-  coffee_shop: 'Cà phê',
-  coffee: 'Cà phê',
-  bakery: 'Bánh ngọt',
-  burger: 'Burger',
-  pizza: 'Pizza',
-  chicken: 'Món gà',
-  asian: 'Món Á',
-  vegetarian: 'Món chay',
-  ice_cream: 'Kem',
+const fallbackImages = {
+  vietnamese: 'https://images.unsplash.com/photo-1582878826629-29b7ad1cdc43?w=800&auto=format&fit=crop&q=80',
+  noodle: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800&auto=format&fit=crop&q=80',
+  sandwich: 'https://images.unsplash.com/photo-1626082927389-6cd097cdc6ec?w=800&auto=format&fit=crop&q=80',
+  bakery: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=800&auto=format&fit=crop&q=80',
+  seafood: 'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=800&auto=format&fit=crop&q=80',
+  barbecue: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&auto=format&fit=crop&q=80',
+  fast_food: 'https://images.unsplash.com/photo-1561758033-d89a9ad46330?w=800&auto=format&fit=crop&q=80',
+  dessert: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=800&auto=format&fit=crop&q=80',
+  default: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&auto=format&fit=crop&q=80',
 };
 
-const requireDatabase = (res) => {
-  if (isConnected) return true;
-  res.status(503).json({
-    message: 'MongoDB chưa kết nối nên chưa thể lưu dữ liệu quán ăn. Hãy kiểm tra MONGO_URI.',
-  });
+const getFallbackImage = (primaryType = '', name = '', types = []) => {
+  const text = `${primaryType} ${name} ${types.join(' ')}`.toLowerCase();
+  if (/bánh mì|sandwich|burger/i.test(text)) return fallbackImages.sandwich;
+  if (/phở|bún|miến|hủ tiếu|mì|ramen|noodle/i.test(text)) return fallbackImages.noodle;
+  if (/bánh|bakery|pastry|cake/i.test(text)) return fallbackImages.bakery;
+  if (/hải sản|seafood|ốc|tôm|cua/i.test(text)) return fallbackImages.seafood;
+  if (/nướng|bbq|barbecue|bò/i.test(text)) return fallbackImages.barbecue;
+  if (/chè|kem|dessert|ice_cream/i.test(text)) return fallbackImages.dessert;
+  if (/fast_food|gà rán|pizza/i.test(text)) return fallbackImages.fast_food;
+  if (/cơm|vietnamese|món việt/i.test(text)) return fallbackImages.vietnamese;
+  return fallbackImages.default;
+};
+
+// Exclude beverage / coffee / tea / bar / alcohol places strictly
+const isBeveragePlace = (place) => {
+  const primaryType = (place.primaryType || '').toLowerCase();
+  const types = (place.types || []).map((t) => t.toLowerCase());
+  const name = (place.displayName?.text || place.name || '').toLowerCase();
+
+  const beverageTypes = [
+    'cafe', 'coffee_shop', 'tea_house', 'bar', 'pub',
+    'wine_bar', 'liquor_store', 'cocktail_bar', 'hookah_bar',
+  ];
+  if (beverageTypes.includes(primaryType)) return true;
+
+  // Name keywords for purely drinks/coffee
+  if (/\b(cà phê|cafe|café|coffee|trà sữa|milktea|milk tea|trà chanh|tiệm trà|quán nước|sinh tố|nước ép|nước mía|beer club|pub|lounge|roastery|brew)\b/i.test(name)) {
+    // Only allow if it explicitly contains a main food dish (e.g. "Cơm tấm & Cafe" or "Bánh mì & Cà phê")
+    if (!/\b(cơm|phở|bún|bánh mì|nhà hàng|quán ăn|mì|lẩu|nướng|hải sản)\b/i.test(name)) {
+      return true;
+    }
+  }
+
+  if (types.includes('coffee_shop') || types.includes('tea_house')) {
+    if (!types.includes('restaurant') && !types.includes('meal_takeaway')) {
+      return true;
+    }
+  }
+
+  // Also filter non-food services that may leak in
+  if (/clothing_store|hotel|lodging|gym|spa|bank|hospital|gas_station|convenience_store/i.test(primaryType)) {
+    if (!/\b(nhà hàng|quán ăn|restaurant|bếp)\b/i.test(name)) {
+      return true;
+    }
+  }
+
   return false;
+};
+
+const determineMealTypes = (types = [], name = '') => {
+  const lowerName = name.toLowerCase();
+  const mealTypes = new Set();
+
+  const isBreakfast = types.some((t) => ['sandwich_shop', 'bakery'].includes(t))
+    || /phở|bánh mì|bún|xôi|cháo|miến|hủ tiếu|điểm tâm/i.test(lowerName);
+  const isSnack = types.some((t) => ['bakery', 'dessert_shop', 'ice_cream_shop', 'snack_bar'].includes(t))
+    || /chè|kem|bánh ngọt|ăn vặt|ốc|bánh tráng|nem chua/i.test(lowerName);
+  const isLunchOrDinner = types.some((t) => [
+    'restaurant', 'vietnamese_restaurant', 'asian_restaurant',
+    'food_court', 'fast_food_restaurant', 'seafood_restaurant',
+    'barbecue_restaurant', 'pizza_restaurant',
+  ].includes(t)) || /cơm|nhà hàng|quán ăn|lẩu|nướng|hải sản|quán|bếp/i.test(lowerName);
+
+  if (isBreakfast) {
+    mealTypes.add('breakfast');
+    mealTypes.add('lunch');
+  }
+  if (isSnack) {
+    mealTypes.add('snack');
+  }
+  if (isLunchOrDinner) {
+    mealTypes.add('lunch');
+    mealTypes.add('dinner');
+  }
+
+  if (mealTypes.size === 0) {
+    mealTypes.add('lunch');
+    mealTypes.add('dinner');
+  }
+
+  const primaryMeal = isBreakfast ? 'breakfast' : isSnack ? 'snack' : 'lunch';
+  return {
+    mealType: primaryMeal,
+    mealTypes: Array.from(mealTypes),
+  };
+};
+
+const googlePriceLabels = {
+  PRICE_LEVEL_FREE: 'Miễn phí',
+  PRICE_LEVEL_INEXPENSIVE: 'Giá bình dân (~20k - 50k)',
+  PRICE_LEVEL_MODERATE: 'Giá vừa phải (~50k - 150k)',
+  PRICE_LEVEL_EXPENSIVE: 'Giá cao (~150k - 300k)',
+  PRICE_LEVEL_VERY_EXPENSIVE: 'Giá sang trọng (>300k)',
 };
 
 const parseCoordinates = (query, res) => {
   const lat = Number(query.lat);
   const lon = Number(query.lon);
-  const radius = Math.min(MAX_RADIUS, Math.max(500, Number(query.radius) || DEFAULT_RADIUS));
+  const radius = Math.min(MAX_RADIUS, Math.max(800, Number(query.radius) || DEFAULT_RADIUS));
   if (!Number.isFinite(lat) || lat < -90 || lat > 90 || !Number.isFinite(lon) || lon < -180 || lon > 180) {
     res.status(400).json({ message: 'Tọa độ lat/lon không hợp lệ.' });
     return null;
   }
   return { lat, lon, radius };
-};
-
-const getPoint = (element) => {
-  const lat = Number(element.lat ?? element.center?.lat);
-  const lon = Number(element.lon ?? element.center?.lon);
-  return Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null;
 };
 
 const cleanAddress = (value = '') => value
@@ -62,6 +142,302 @@ const cleanAddress = (value = '') => value
     && !/^(unnamed road|đường không tên)$/i.test(part)
     && !/^[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{2,3}$/i.test(part))
   .join(', ');
+
+const toRadians = (value) => (value * Math.PI) / 180;
+const distanceBetween = (origin, destination) => {
+  const earthRadiusKm = 6371;
+  const deltaLat = toRadians(destination.lat - origin.lat);
+  const deltaLon = toRadians(destination.lon - origin.lon);
+  const a = Math.sin(deltaLat / 2) ** 2
+    + Math.cos(toRadians(origin.lat)) * Math.cos(toRadians(destination.lat))
+    * Math.sin(deltaLon / 2) ** 2;
+  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const serializeFood = (food, baseUrl = '') => {
+  const value = food.toObject ? food.toObject() : food;
+  const id = value._id?.toString() || value.id;
+  const distanceKm = Number.isFinite(value.distanceMeters)
+    ? Math.round((value.distanceMeters / 1000) * 100) / 100
+    : value.distanceNum ?? null;
+
+  const image = value.source === 'google_places' && value.googlePhotoRef && baseUrl
+    ? `${baseUrl}/api/foods/google-photo?ref=${encodeURIComponent(value.googlePhotoRef)}`
+    : value.image;
+
+  return {
+    ...value,
+    _id: id,
+    id,
+    image,
+    distanceNum: distanceKm,
+    distance: distanceKm === null ? '' : distanceKm < 1 ? `${Math.round(distanceKm * 1000)}m` : `${distanceKm} km`,
+    openHours: value.openingHours || value.openHours || '',
+    tags: value.cuisines || value.tags || [],
+  };
+};
+
+/* =========================================================================
+ * 1. GOOGLE PLACES API (NEW) - CHỈ LẤY CÁC QUÁN ĂN (FOOD ONLY)
+ * ========================================================================= */
+
+const fetchGooglePlacesBatch = async (area, types, rankPreference, apiKey) => {
+  const response = await fetch(GOOGLE_NEARBY_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-Goog-Api-Key': apiKey,
+      'X-Goog-FieldMask': [
+        'places.id',
+        'places.displayName',
+        'places.primaryType',
+        'places.primaryTypeDisplayName',
+        'places.types',
+        'places.formattedAddress',
+        'places.location',
+        'places.googleMapsUri',
+        'places.rating',
+        'places.userRatingCount',
+        'places.priceLevel',
+        'places.currentOpeningHours',
+        'places.regularOpeningHours',
+        'places.nationalPhoneNumber',
+        'places.websiteUri',
+        'places.photos',
+      ].join(','),
+    },
+    body: JSON.stringify({
+      includedTypes: types,
+      maxResultCount: 20,
+      rankPreference,
+      languageCode: 'vi',
+      regionCode: 'VN',
+      locationRestriction: {
+        circle: {
+          center: { latitude: area.lat, longitude: area.lon },
+          radius: area.radius,
+        },
+      },
+    }),
+  });
+
+  if (!response.ok) {
+    const detail = await response.text();
+    throw new Error(`Google Places HTTP ${response.status}: ${detail.slice(0, 200)}`);
+  }
+  const payload = await response.json();
+  return payload.places || [];
+};
+
+const getGoogleSearchAreas = (coordinates) => {
+  const areaRadius = Math.min(5000, Math.max(3000, coordinates.radius * 0.5));
+  const offsetMeters = Math.max(1800, coordinates.radius - areaRadius);
+  const latitudeOffset = offsetMeters / 111320;
+  const longitudeOffset = offsetMeters / (111320 * Math.max(0.2, Math.cos(toRadians(coordinates.lat))));
+  return [-1, 0, 1].flatMap((latStep) => (
+    [-1, 0, 1].map((lonStep) => ({
+      lat: coordinates.lat + latitudeOffset * latStep,
+      lon: coordinates.lon + longitudeOffset * lonStep,
+      radius: areaRadius,
+    }))
+  ));
+};
+
+const fetchGooglePlaces = async (coordinates, baseUrl) => {
+  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
+  if (!apiKey) return [];
+
+  // Group 1: Bữa chính, Quán cơm, Phở, Bún, Nhà hàng, Hải sản, Nướng
+  const group1Types = [
+    'restaurant',
+    'vietnamese_restaurant',
+    'asian_restaurant',
+    'seafood_restaurant',
+    'barbecue_restaurant',
+  ];
+
+  // Group 2: Bánh mì, Đồ ăn nhanh, Khu ẩm thực, Pizza
+  const group2Types = [
+    'fast_food_restaurant',
+    'sandwich_shop',
+    'meal_takeaway',
+    'food_court',
+    'pizza_restaurant',
+  ];
+
+  // Group 3: Quán ăn cự ly gần nhất (Distance rank)
+  const group3Types = [
+    'restaurant',
+    'vietnamese_restaurant',
+    'sandwich_shop',
+    'fast_food_restaurant',
+    'seafood_restaurant',
+  ];
+
+  // Group 4: Món ăn vặt, tiệm bánh ăn lót dạ, tráng miệng
+  const group4Types = [
+    'dessert_shop',
+    'bakery',
+    'ice_cream_shop',
+  ];
+
+  const searchAreas = getGoogleSearchAreas(coordinates);
+  const centerArea = searchAreas[4];
+  const queries = [
+    ...searchAreas.map((area) => fetchGooglePlacesBatch(area, group1Types, 'POPULARITY', apiKey)),
+    fetchGooglePlacesBatch(centerArea, group2Types, 'POPULARITY', apiKey),
+    fetchGooglePlacesBatch({ ...centerArea, radius: Math.min(3000, centerArea.radius) }, group3Types, 'DISTANCE', apiKey),
+    fetchGooglePlacesBatch(centerArea, group4Types, 'POPULARITY', apiKey),
+  ];
+
+  const results = await Promise.allSettled(queries);
+  const placesMap = new Map();
+
+  for (const res of results) {
+    if (res.status === 'fulfilled' && Array.isArray(res.value)) {
+      for (const place of res.value) {
+        if (place && place.id && !placesMap.has(place.id)) {
+          // STRICT FILTER: Exclude cafes, coffee shops, bubble tea, bars
+          if (isBeveragePlace(place)) {
+            continue;
+          }
+          placesMap.set(place.id, place);
+        }
+      }
+    }
+  }
+
+  const uniquePlaces = Array.from(placesMap.values());
+  if (!uniquePlaces.length) return [];
+
+  const restaurants = uniquePlaces.map((place) => {
+    const lat = Number(place.location?.latitude);
+    const lon = Number(place.location?.longitude);
+    const distanceNum = Number.isFinite(lat) && Number.isFinite(lon)
+      ? Math.round(distanceBetween(coordinates, { lat, lon }) * 100) / 100
+      : null;
+
+    const photo = place.photos?.[0];
+    const photoRef = photo?.name ? Buffer.from(photo.name).toString('base64url') : '';
+    const category = place.primaryTypeDisplayName?.text || 'Quán ăn';
+    const openingHours = place.currentOpeningHours || place.regularOpeningHours;
+    const address = cleanAddress(place.formattedAddress || '');
+    const name = place.displayName?.text || 'Quán ăn';
+
+    const { mealType, mealTypes } = determineMealTypes(place.types || [], name);
+
+    const imageUrl = photoRef
+      ? `${baseUrl}/api/foods/google-photo?ref=${encodeURIComponent(photoRef)}`
+      : getFallbackImage(place.primaryType, name, place.types || []);
+
+    return {
+      _id: place.id,
+      id: place.id,
+      externalId: place.id,
+      source: 'google_places',
+      name,
+      category,
+      mealType,
+      mealTypes,
+      cuisines: [category].filter(Boolean),
+      tags: [category].filter(Boolean),
+      description: address || category,
+      address,
+      phone: place.nationalPhoneNumber || '',
+      website: place.websiteUri || '',
+      image: imageUrl,
+      googlePhotoRef: photoRef,
+      photoAttributions: photo?.authorAttributions || [],
+      openingHours: openingHours?.weekdayDescriptions?.join(' · ') || '',
+      openHours: openingHours?.weekdayDescriptions?.join(' · ') || '',
+      isOpen: typeof place.currentOpeningHours?.openNow === 'boolean' ? place.currentOpeningHours.openNow : null,
+      priceRange: googlePriceLabels[place.priceLevel] || '',
+      rating: place.rating ?? null,
+      reviewsCount: place.userRatingCount ?? null,
+      location: Number.isFinite(lat) && Number.isFinite(lon)
+        ? { type: 'Point', coordinates: [lon, lat] }
+        : null,
+      sourceUrl: place.googleMapsUri || '',
+      attribution: 'Google Maps',
+      distanceNum,
+      distance: distanceNum === null ? '' : distanceNum < 1 ? `${Math.round(distanceNum * 1000)}m` : `${distanceNum} km`,
+    };
+  }).filter((food) => food.distanceNum === null || food.distanceNum <= coordinates.radius / 1000);
+
+  return restaurants.sort((a, b) => (a.distanceNum ?? 99) - (b.distanceNum ?? 99)).slice(0, MAX_RESULTS);
+};
+
+/* =========================================================================
+ * 2. MONGODB BACKGROUND UPSERT
+ * ========================================================================= */
+
+const savePlacesToMongo = async (places) => {
+  if (!isConnected || !Array.isArray(places) || !places.length) return 0;
+  try {
+    const syncedAt = new Date();
+    const expiresAt = new Date(syncedAt.getTime() + GOOGLE_CACHE_DAYS * 24 * 60 * 60 * 1000);
+    const ops = places
+      .slice(0, MAX_RESULTS)
+      .filter((place) => Array.isArray(place.location?.coordinates) && place.location.coordinates.length === 2)
+      .map((place) => {
+      const coords = place.location.coordinates;
+      return {
+        updateOne: {
+          filter: { source: 'google_places', externalId: place.externalId || place.id },
+          update: {
+            $set: {
+              name: place.name,
+              category: place.category,
+              mealType: place.mealType,
+              mealTypes: place.mealTypes || [place.mealType],
+              cuisines: place.cuisines || [],
+              description: place.description || '',
+              address: place.address,
+              phone: place.phone,
+              website: place.website,
+              image: place.googlePhotoRef ? '' : place.image,
+              googlePhotoRef: place.googlePhotoRef || '',
+              photoAttributions: place.photoAttributions || [],
+              openingHours: place.openingHours,
+              priceRange: place.priceRange,
+              rating: place.rating,
+              reviewsCount: place.reviewsCount,
+              isOpen: place.isOpen,
+              location: { type: 'Point', coordinates: coords },
+              sourceUrl: place.sourceUrl,
+              attribution: 'Google Maps',
+              rawTags: {},
+              active: true,
+              lastSyncedAt: syncedAt,
+              expiresAt,
+            },
+            $setOnInsert: {
+              source: 'google_places',
+              externalId: place.externalId || place.id,
+            },
+          },
+          upsert: true,
+        },
+      };
+    });
+    if (!ops.length) return 0;
+    await Food.bulkWrite(ops, { ordered: false });
+    return ops.length;
+  } catch (err) {
+    console.error('[Food Mongo Cache Error]:', err.message);
+    return 0;
+  }
+};
+
+/* =========================================================================
+ * 3. OPENSTREETMAP (OVERPASS) FALLBACK - CHỈ QUÁN ĂN
+ * ========================================================================= */
+
+const getPoint = (element) => {
+  const lat = Number(element.lat ?? element.center?.lat);
+  const lon = Number(element.lon ?? element.center?.lon);
+  return Number.isFinite(lat) && Number.isFinite(lon) ? { lat, lon } : null;
+};
 
 const getAddress = (tags = {}) => {
   if (tags['addr:full']) return cleanAddress(tags['addr:full']);
@@ -77,7 +453,6 @@ const getAddress = (tags = {}) => {
 
 const getCategory = (tags = {}) => {
   const value = tags.amenity || tags.shop;
-  if (value === 'cafe') return 'Cà phê';
   if (value === 'fast_food') return 'Đồ ăn nhanh';
   if (value === 'food_court') return 'Khu ẩm thực';
   if (value === 'ice_cream') return 'Kem & tráng miệng';
@@ -85,31 +460,14 @@ const getCategory = (tags = {}) => {
   return 'Quán ăn';
 };
 
-const getMealType = (tags = {}) => {
-  const value = tags.amenity || tags.shop;
-  if (value === 'cafe') return 'drink';
-  if (value === 'ice_cream' || value === 'bakery') return 'snack';
-  return 'lunch';
-};
-
-const getCuisines = (tags = {}) => (tags.cuisine || '')
-  .split(/[;,]/)
-  .map((value) => value.trim().toLowerCase())
-  .filter(Boolean)
-  .map((value) => cuisineLabels[value] || value.replaceAll('_', ' '));
-
-const getImage = (tags = {}) => {
-  const value = tags.image || '';
-  return /^https?:\/\//i.test(value) ? value : '';
-};
-
 const normalizeElement = (element, syncedAt) => {
   const point = getPoint(element);
   const tags = element.tags || {};
   const name = tags['name:vi'] || tags.name;
   if (!point || !name?.trim()) return null;
-  const cuisines = getCuisines(tags);
   const category = getCategory(tags);
+  const { mealType, mealTypes } = determineMealTypes([tags.amenity, tags.shop].filter(Boolean), name);
+
   return {
     updateOne: {
       filter: { source: 'openstreetmap', externalId: `${element.type}/${element.id}` },
@@ -118,13 +476,13 @@ const normalizeElement = (element, syncedAt) => {
           osmType: element.type,
           name: name.trim(),
           category,
-          mealType: getMealType(tags),
-          cuisines,
-          description: cuisines.length ? `${category} · ${cuisines.join(', ')}` : category,
+          mealType,
+          mealTypes,
+          description: getAddress(tags) || category,
           address: getAddress(tags),
           phone: tags.phone || tags['contact:phone'] || '',
           website: tags.website || tags['contact:website'] || '',
-          image: getImage(tags),
+          image: getFallbackImage(tags.amenity, name),
           openingHours: tags.opening_hours || '',
           priceRange: tags.charge || '',
           location: { type: 'Point', coordinates: [point.lon, point.lat] },
@@ -142,229 +500,46 @@ const normalizeElement = (element, syncedAt) => {
 };
 
 const fetchOverpass = async ({ lat, lon, radius }) => {
-  const query = `[out:json][timeout:25];(
-    nwr["amenity"~"^(restaurant|fast_food|food_court)$"](around:${radius},${lat},${lon});
-  );out center;`;
-  const errors = [];
+  const searchRadius = Math.min(3500, radius);
+  const query = `[out:json][timeout:12];(
+    node["amenity"~"^(restaurant|fast_food|food_court)$"](around:${searchRadius},${lat},${lon});
+    way["amenity"~"^(restaurant|fast_food|food_court)$"](around:${searchRadius},${lat},${lon});
+  );out center 60;`;
 
   for (const endpoint of OVERPASS_ENDPOINTS) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 30000);
+    const timeout = setTimeout(() => controller.abort(), 12000);
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-          'User-Agent': `Todayly/1.0 (${process.env.OVERPASS_CONTACT || 'local-development'})`,
+          'User-Agent': 'Todayly/1.0',
         },
         body: new URLSearchParams({ data: query }),
         signal: controller.signal,
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) continue;
       const payload = await response.json();
-      return Array.isArray(payload.elements) ? payload.elements : [];
-    } catch (error) {
-      errors.push(`${endpoint}: ${error.name === 'AbortError' ? 'timeout' : error.message}`);
+      if (Array.isArray(payload.elements)) return payload.elements;
+    } catch {
+      // try next
     } finally {
       clearTimeout(timeout);
     }
   }
-
-  throw new Error(errors.join(' | '));
+  return [];
 };
 
 const syncNearbyFoods = async (coordinates) => {
   const elements = await fetchOverpass(coordinates);
+  if (!elements.length) return 0;
   const syncedAt = new Date();
   const operations = elements
     .map((element) => normalizeElement(element, syncedAt))
     .filter(Boolean);
   if (operations.length) await Food.bulkWrite(operations, { ordered: false });
   return operations.length;
-};
-
-const toRadians = (value) => value * Math.PI / 180;
-const distanceBetween = (origin, destination) => {
-  const earthRadiusKm = 6371;
-  const deltaLat = toRadians(destination.lat - origin.lat);
-  const deltaLon = toRadians(destination.lon - origin.lon);
-  const a = Math.sin(deltaLat / 2) ** 2
-    + Math.cos(toRadians(origin.lat)) * Math.cos(toRadians(destination.lat))
-    * Math.sin(deltaLon / 2) ** 2;
-  return earthRadiusKm * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-};
-
-const googlePriceLabels = {
-  PRICE_LEVEL_FREE: 'Miễn phí',
-  PRICE_LEVEL_INEXPENSIVE: 'Giá bình dân',
-  PRICE_LEVEL_MODERATE: 'Giá vừa phải',
-  PRICE_LEVEL_EXPENSIVE: 'Giá cao',
-  PRICE_LEVEL_VERY_EXPENSIVE: 'Giá rất cao',
-};
-
-const getGoogleMealType = (types = []) => {
-  if (types.includes('cafe') || types.includes('coffee_shop')) return 'drink';
-  if (types.includes('bakery') || types.includes('ice_cream_shop') || types.includes('dessert_shop')) return 'snack';
-  return 'lunch';
-};
-
-const getGoogleAddress = (place) => {
-  const formatted = cleanAddress(place.formattedAddress || '');
-  if (!/\+/.test(place.formattedAddress || '')) return formatted;
-
-  const components = place.addressComponents || [];
-  const getComponent = (...types) => components.find((component) => (
-    types.some((type) => component.types?.includes(type))
-  ))?.longText;
-  const street = [
-    getComponent('street_number'),
-    getComponent('route'),
-  ].filter(Boolean).join(' ');
-  const parts = [
-    street,
-    getComponent('neighborhood', 'sublocality_level_2', 'sublocality_level_1'),
-    getComponent('administrative_area_level_2', 'locality'),
-    getComponent('administrative_area_level_1'),
-    getComponent('postal_code'),
-  ].filter(Boolean);
-  return [...new Map(parts.map((part) => [part.toLocaleLowerCase('vi'), part])).values()].join(', ') || formatted;
-};
-
-const getGoogleSearchAreas = (coordinates) => {
-  const pageRadius = Math.min(5000, Math.max(2500, coordinates.radius * 0.6));
-  const offsetMeters = Math.max(1200, coordinates.radius - pageRadius);
-  const latitudeOffset = offsetMeters / 111320;
-  const longitudeOffset = offsetMeters / (111320 * Math.max(0.2, Math.cos(toRadians(coordinates.lat))));
-  return [
-    { lat: coordinates.lat, lon: coordinates.lon, radius: pageRadius },
-    { lat: coordinates.lat + latitudeOffset, lon: coordinates.lon, radius: pageRadius },
-    { lat: coordinates.lat - latitudeOffset, lon: coordinates.lon, radius: pageRadius },
-    { lat: coordinates.lat, lon: coordinates.lon + longitudeOffset, radius: pageRadius },
-    { lat: coordinates.lat, lon: coordinates.lon - longitudeOffset, radius: pageRadius },
-  ];
-};
-
-const fetchGooglePlacesPage = async (area, apiKey) => {
-  const response = await fetch(GOOGLE_NEARBY_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-Goog-Api-Key': apiKey,
-      'X-Goog-FieldMask': [
-        'places.id',
-        'places.displayName',
-        'places.primaryType',
-        'places.primaryTypeDisplayName',
-        'places.types',
-        'places.formattedAddress',
-        'places.addressComponents',
-        'places.location',
-        'places.googleMapsUri',
-        'places.rating',
-        'places.userRatingCount',
-        'places.priceLevel',
-        'places.currentOpeningHours',
-        'places.regularOpeningHours',
-        'places.nationalPhoneNumber',
-        'places.websiteUri',
-        'places.photos',
-      ].join(','),
-    },
-    body: JSON.stringify({
-      includedPrimaryTypes: ['restaurant'],
-      maxResultCount: 20,
-      rankPreference: 'DISTANCE',
-      languageCode: 'vi',
-      regionCode: 'VN',
-      locationRestriction: {
-        circle: {
-          center: { latitude: area.lat, longitude: area.lon },
-          radius: area.radius,
-        },
-      },
-    }),
-  });
-  if (!response.ok) {
-    const detail = await response.text();
-    throw new Error(`Google Places HTTP ${response.status}: ${detail.slice(0, 300)}`);
-  }
-  const payload = await response.json();
-  return payload.places || [];
-};
-
-const fetchGooglePlaces = async (coordinates, baseUrl) => {
-  const apiKey = process.env.GOOGLE_PLACES_API_KEY;
-  if (!apiKey) return [];
-  const pageResults = await Promise.allSettled(getGoogleSearchAreas(coordinates).map((area) => (
-    fetchGooglePlacesPage(area, apiKey)
-  )));
-  const pages = pageResults
-    .filter((result) => result.status === 'fulfilled')
-    .map((result) => result.value);
-  if (!pages.length) throw pageResults[0]?.reason || new Error('Google Places không trả về dữ liệu.');
-  const uniquePlaces = [...new Map(pages.flat().map((place) => [place.id, place])).values()];
-  const restaurants = uniquePlaces.map((place) => {
-    const lat = Number(place.location?.latitude);
-    const lon = Number(place.location?.longitude);
-    const distanceNum = Number.isFinite(lat) && Number.isFinite(lon)
-      ? Math.round(distanceBetween(coordinates, { lat, lon }) * 100) / 100
-      : null;
-    const photo = place.photos?.[0];
-    const photoRef = photo?.name ? Buffer.from(photo.name).toString('base64url') : '';
-    const category = place.primaryTypeDisplayName?.text || 'Quán ăn';
-    const openingHours = place.currentOpeningHours || place.regularOpeningHours;
-    const address = getGoogleAddress(place);
-    return {
-      _id: place.id,
-      id: place.id,
-      externalId: place.id,
-      source: 'google_places',
-      name: place.displayName?.text || 'Địa điểm ăn uống',
-      category,
-      mealType: getGoogleMealType(place.types),
-      cuisines: [],
-      description: address,
-      address,
-      phone: place.nationalPhoneNumber || '',
-      website: place.websiteUri || '',
-      image: photoRef ? `${baseUrl}/api/foods/google-photo?ref=${encodeURIComponent(photoRef)}` : '',
-      photoAttributions: photo?.authorAttributions || [],
-      openingHours: openingHours?.weekdayDescriptions?.join(' · ') || '',
-      openHours: openingHours?.weekdayDescriptions?.join(' · ') || '',
-      isOpen: typeof place.currentOpeningHours?.openNow === 'boolean' ? place.currentOpeningHours.openNow : null,
-      priceRange: googlePriceLabels[place.priceLevel] || '',
-      rating: place.rating ?? null,
-      reviewsCount: place.userRatingCount ?? null,
-      location: Number.isFinite(lat) && Number.isFinite(lon)
-        ? { type: 'Point', coordinates: [lon, lat] }
-        : null,
-      sourceUrl: place.googleMapsUri || '',
-      attribution: 'Google Maps',
-      distanceNum,
-      distance: distanceNum === null ? '' : distanceNum < 1 ? `${Math.round(distanceNum * 1000)}m` : `${distanceNum} km`,
-    };
-  }).filter((food) => food.distanceNum === null || food.distanceNum <= coordinates.radius / 1000);
-  const completeRestaurants = restaurants.filter((food) => food.image && food.address);
-  return completeRestaurants.length >= 4
-    ? completeRestaurants.sort((a, b) => a.distanceNum - b.distanceNum).slice(0, MAX_RESULTS)
-    : restaurants.sort((a, b) => Number(Boolean(b.image)) - Number(Boolean(a.image))).slice(0, MAX_RESULTS);
-};
-
-const serializeFood = (food) => {
-  const value = food.toObject ? food.toObject() : food;
-  const id = value._id?.toString() || value.id;
-  const distanceKm = Number.isFinite(value.distanceMeters)
-    ? Math.round((value.distanceMeters / 1000) * 100) / 100
-    : null;
-  return {
-    ...value,
-    _id: id,
-    id,
-    distanceNum: distanceKm,
-    distance: distanceKm === null ? '' : distanceKm < 1 ? `${Math.round(distanceKm * 1000)}m` : `${distanceKm} km`,
-    openHours: value.openingHours || '',
-    tags: value.cuisines || [],
-  };
 };
 
 const findNearby = ({ lat, lon, radius }) => Food.aggregate([
@@ -374,20 +549,40 @@ const findNearby = ({ lat, lon, radius }) => Food.aggregate([
       distanceField: 'distanceMeters',
       maxDistance: radius,
       spherical: true,
-      query: { active: true, mealType: { $in: ['breakfast', 'lunch', 'dinner'] } },
+      query: {
+        active: true,
+        mealType: { $ne: 'drink' },
+        $or: [
+          { source: 'openstreetmap' },
+          { source: 'google_places', expiresAt: { $gt: new Date() } },
+        ],
+      },
     },
   },
   { $limit: MAX_RESULTS },
 ]);
 
+/* =========================================================================
+ * 4. CONTROLLER HANDLERS
+ * ========================================================================= */
+
 export const getFoods = async (req, res, next) => {
   try {
-    if (!requireDatabase(res)) return;
+    if (!isConnected) {
+      return res.json([]);
+    }
     const foods = await Food.find({
       active: true,
-      mealType: { $in: ['breakfast', 'lunch', 'dinner'] },
-    }).sort({ lastSyncedAt: -1, name: 1 }).limit(MAX_RESULTS);
-    res.json(foods.map(serializeFood));
+      mealType: { $ne: 'drink' },
+      $or: [
+        { source: 'openstreetmap' },
+        { source: 'google_places', expiresAt: { $gt: new Date() } },
+      ],
+    })
+      .sort({ lastSyncedAt: -1, name: 1 })
+      .limit(MAX_RESULTS);
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    res.json(foods.map((food) => serializeFood(food, baseUrl)));
   } catch (error) {
     next(error);
   }
@@ -395,49 +590,82 @@ export const getFoods = async (req, res, next) => {
 
 export const getNearbyFoods = async (req, res, next) => {
   try {
-    if (!requireDatabase(res)) return;
     const coordinates = parseCoordinates(req.query, res);
     if (!coordinates) return;
 
-    const cacheHours = Math.max(1, Number(process.env.FOOD_CACHE_HOURS) || 12);
-    const cacheCutoff = new Date(Date.now() - cacheHours * 60 * 60 * 1000);
-    const cachedNearby = await Food.findOne({
-      active: true,
-      lastSyncedAt: { $gte: cacheCutoff },
-      location: {
-        $near: {
-          $geometry: { type: 'Point', coordinates: [coordinates.lon, coordinates.lat] },
-          $maxDistance: coordinates.radius,
-        },
-      },
-    }).select('_id');
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    const forceRefresh = req.query.refresh === 'true';
 
-    let syncError = null;
-    if (!cachedNearby || req.query.refresh === 'true') {
-      try {
-        await syncNearbyFoods(coordinates);
-      } catch (error) {
-        syncError = error;
+    if (isConnected && !forceRefresh) {
+      const cachedFoods = await findNearby(coordinates);
+      const freshCutoff = Date.now() - 12 * 60 * 60 * 1000;
+      const freshGoogleCount = cachedFoods.filter((food) => (
+        food.source === 'google_places'
+        && new Date(food.lastSyncedAt).getTime() >= freshCutoff
+      )).length;
+      if (freshGoogleCount >= MIN_GOOGLE_CACHE_RESULTS) {
+        res.setHeader('X-Todayly-Places-Cache', 'HIT');
+        res.setHeader('X-Todayly-Total-Places', String(cachedFoods.length));
+        return res.json(cachedFoods.map((food) => serializeFood(food, baseUrl)));
       }
     }
 
-    const foods = await findNearby(coordinates);
-    if (!foods.length && syncError) {
-      res.status(502);
-      throw new Error(`Không lấy được dữ liệu OpenStreetMap: ${syncError.message}`);
-    }
-    if (syncError) res.setHeader('X-Todayly-Data-Stale', 'true');
+    // 1. Prioritize Google Places API (Food only)
     if (process.env.GOOGLE_PLACES_API_KEY) {
       try {
-        const baseUrl = `${req.protocol}://${req.get('host')}`;
         const googleFoods = await fetchGooglePlaces(coordinates, baseUrl);
-        if (googleFoods.length) return res.json(googleFoods);
-      } catch (error) {
-        res.setHeader('X-Todayly-Google-Places-Error', 'true');
-        console.error(`[Google Places]: ${error.message}`);
+        if (googleFoods && googleFoods.length > 0) {
+          const savedCount = await savePlacesToMongo(googleFoods);
+          res.setHeader('X-Todayly-Saved-Places', String(savedCount));
+          if (savedCount > 0) {
+            const storedFoods = await findNearby(coordinates);
+            res.setHeader('X-Todayly-Total-Places', String(storedFoods.length));
+            return res.json(storedFoods.map((food) => serializeFood(food, baseUrl)));
+          }
+          res.setHeader('X-Todayly-Total-Places', String(googleFoods.length));
+          return res.json(googleFoods);
+        }
+      } catch (googleError) {
+        console.error(`[Google Places Warning]: ${googleError.message}`);
       }
     }
-    res.json(foods.map(serializeFood));
+
+    // 2. Fallback to MongoDB & OpenStreetMap
+    if (isConnected) {
+      const cacheHours = Math.max(1, Number(process.env.FOOD_CACHE_HOURS) || 12);
+      const cacheCutoff = new Date(Date.now() - cacheHours * 60 * 60 * 1000);
+      const cachedNearby = await Food.findOne({
+        active: true,
+        mealType: { $ne: 'drink' },
+        lastSyncedAt: { $gte: cacheCutoff },
+        $or: [
+          { source: 'openstreetmap' },
+          { source: 'google_places', expiresAt: { $gt: new Date() } },
+        ],
+        location: {
+          $near: {
+            $geometry: { type: 'Point', coordinates: [coordinates.lon, coordinates.lat] },
+            $maxDistance: coordinates.radius,
+          },
+        },
+      }).select('_id');
+
+      if (!cachedNearby || req.query.refresh === 'true') {
+        try {
+          await syncNearbyFoods(coordinates);
+        } catch (osmError) {
+          console.warn(`[OSM Sync Warning]: ${osmError.message}`);
+        }
+      }
+
+      const dbFoods = await findNearby(coordinates);
+      if (dbFoods && dbFoods.length > 0) {
+        return res.json(dbFoods.map((food) => serializeFood(food, baseUrl)));
+      }
+    }
+
+    // 3. Fallback: Return empty array instead of 502/503
+    res.json([]);
   } catch (error) {
     next(error);
   }
@@ -457,13 +685,13 @@ export const getGoogleFoodPhoto = async (req, res, next) => {
       return res.status(400).json({ message: 'Tham chiếu ảnh Google Places không hợp lệ.' });
     }
     const url = new URL(`https://places.googleapis.com/v1/${photoName}/media`);
-    url.searchParams.set('maxWidthPx', '1200');
+    url.searchParams.set('maxWidthPx', '1000');
     const response = await fetch(url, { headers: { 'X-Goog-Api-Key': apiKey } });
     if (!response.ok) throw new Error(`Google Place Photo trả về HTTP ${response.status}`);
     const contentType = response.headers.get('content-type') || 'image/jpeg';
     const image = Buffer.from(await response.arrayBuffer());
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
     res.send(image);
   } catch (error) {
     next(error);
@@ -472,13 +700,16 @@ export const getGoogleFoodPhoto = async (req, res, next) => {
 
 export const getFoodById = async (req, res, next) => {
   try {
-    if (!requireDatabase(res)) return;
+    if (!isConnected) {
+      return res.status(503).json({ message: 'Cơ sở dữ liệu đang kết nối.' });
+    }
     if (!mongoose.isValidObjectId(req.params.id)) {
       return res.status(400).json({ message: 'ID quán ăn không hợp lệ.' });
     }
     const food = await Food.findById(req.params.id);
     if (!food) return res.status(404).json({ message: 'Không tìm thấy quán ăn.' });
-    res.json(serializeFood(food));
+    const baseUrl = `${req.protocol}://${req.get('host')}`;
+    res.json(serializeFood(food, baseUrl));
   } catch (error) {
     next(error);
   }

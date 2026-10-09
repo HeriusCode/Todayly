@@ -4,7 +4,11 @@ const foodSchema = new mongoose.Schema(
   {
     source: { type: String, required: true, default: 'openstreetmap', index: true },
     externalId: { type: String, required: true },
-    osmType: { type: String, enum: ['node', 'way', 'relation'], required: true },
+    osmType: {
+      type: String,
+      enum: ['node', 'way', 'relation'],
+      required() { return this.source === 'openstreetmap'; },
+    },
     name: { type: String, required: true, trim: true },
     category: { type: String, default: 'Quán ăn' },
     mealType: {
@@ -12,12 +16,18 @@ const foodSchema = new mongoose.Schema(
       enum: ['breakfast', 'lunch', 'dinner', 'snack', 'drink'],
       default: 'lunch',
     },
+    mealTypes: [{
+      type: String,
+      enum: ['breakfast', 'lunch', 'dinner', 'snack', 'drink'],
+    }],
     cuisines: [{ type: String, trim: true }],
     description: { type: String, default: '' },
     address: { type: String, default: '' },
     phone: { type: String, default: '' },
     website: { type: String, default: '' },
     image: { type: String, default: '' },
+    googlePhotoRef: { type: String, default: '' },
+    photoAttributions: { type: [mongoose.Schema.Types.Mixed], default: [] },
     openingHours: { type: String, default: '' },
     priceRange: { type: String, default: '' },
     rating: { type: Number, min: 0, max: 5, default: null },
@@ -39,11 +49,13 @@ const foodSchema = new mongoose.Schema(
     rawTags: { type: mongoose.Schema.Types.Mixed, default: {} },
     active: { type: Boolean, default: true, index: true },
     lastSyncedAt: { type: Date, required: true, index: true },
+    expiresAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
 
 foodSchema.index({ source: 1, externalId: 1 }, { unique: true });
 foodSchema.index({ location: '2dsphere' });
+foodSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
 
 export default mongoose.model('Food', foodSchema);

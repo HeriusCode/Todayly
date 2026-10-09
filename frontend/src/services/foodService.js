@@ -2,30 +2,43 @@ import api from './api';
 
 const nearbyRequests = new Map();
 
-const getPosition = () => new Promise((resolve, reject) => {
+const getPosition = () => new Promise((resolve) => {
   if (!navigator.geolocation) {
-    reject(new Error('Trình duyệt không hỗ trợ định vị.'));
+    resolve({ coords: { latitude: 21.0285, longitude: 105.8542 } });
     return;
   }
-  navigator.geolocation.getCurrentPosition(resolve, reject, {
-    enableHighAccuracy: true,
-    timeout: 12000,
-    maximumAge: 300000,
-  });
+  navigator.geolocation.getCurrentPosition(
+    (pos) => resolve(pos),
+    () => {
+      // Graceful fallback to center coordinates if user denies or times out
+      resolve({ coords: { latitude: 21.0285, longitude: 105.8542 } });
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 8000,
+      maximumAge: 300000,
+    }
+  );
 });
 
 export const foodService = {
   getAll: async (params = {}) => {
-    const response = await api.get('/foods', { params });
-    return Array.isArray(response.data) ? response.data : [];
+    try {
+      const response = await api.get('/foods', { params });
+      return Array.isArray(response.data) ? response.data : [];
+    } catch {
+      return [];
+    }
   },
 
-  getNearby: async ({ lat, lon, radius = 8000, refresh = false }) => {
-    const requestKey = [lat.toFixed(4), lon.toFixed(4), radius, refresh].join(':');
+  getNearby: async ({ lat, lon, radius = 10000, refresh = false }) => {
+    const requestKey = [Number(lat).toFixed(4), Number(lon).toFixed(4), radius, refresh].join(':');
     if (nearbyRequests.has(requestKey)) return nearbyRequests.get(requestKey);
+
     const request = api.get('/foods/nearby', {
       params: { lat, lon, radius, refresh },
     }).then((response) => (Array.isArray(response.data) ? response.data : []));
+
     nearbyRequests.set(requestKey, request);
     try {
       return await request;
@@ -34,7 +47,7 @@ export const foodService = {
     }
   },
 
-  getNearbyForDevice: async ({ radius = 8000, refresh = false } = {}) => {
+  getNearbyForDevice: async ({ radius = 10000, refresh = false } = {}) => {
     const position = await getPosition();
     return foodService.getNearby({
       lat: position.coords.latitude,
