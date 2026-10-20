@@ -11,7 +11,7 @@ import Drinks from './pages/Drinks';
 import Places from './pages/Places';
 import Outfit from './pages/Outfit';
 import Wheel from './pages/Wheel';
-import Favorites from './pages/Favorites';
+import Summary from './pages/Summary';
 import Profile from './pages/Profile';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -32,7 +32,8 @@ export default function App() {
             <Route path="/places" element={<Places />} />
             <Route path="/outfit" element={<Outfit />} />
             <Route path="/wheel" element={<Wheel />} />
-            <Route path="/favorites" element={<Favorites />} />
+            <Route path="/summary" element={<Summary />} />
+            <Route path="/favorites" element={<Navigate to="/summary" replace />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />

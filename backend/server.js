@@ -9,6 +9,7 @@ import weatherRoutes from './routes/weatherRoutes.js';
 import foodRoutes from './routes/foodRoutes.js';
 import drinkRoutes from './routes/drinkRoutes.js';
 import placeRoutes from './routes/placeRoutes.js';
+import outfitRoutes from './routes/outfitRoutes.js';
 import { notFound, errorHandler } from './middleware/errorMiddleware.js';
 
 if (!process.env.JWT_SECRET) {
@@ -37,6 +38,7 @@ app.use('/api/weather', weatherRoutes);
 app.use('/api/foods', foodRoutes);
 app.use('/api/drinks', drinkRoutes);
 app.use('/api/places', placeRoutes);
+app.use('/api/outfits', outfitRoutes);
 
 app.use(notFound);
 app.use(errorHandler);

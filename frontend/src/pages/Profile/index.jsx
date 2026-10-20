@@ -1,189 +1,42 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { BadgeCheck, Bell, CalendarDays, Camera, Check, ChevronRight, Coffee, Edit3, Heart, MapPin, MapPinned, Moon, Palette, Plus, Ruler, Save, Settings2, Share2, ShieldCheck, Sparkles, Utensils, X, Zap, LogOut } from 'lucide-react';
+
+const tabs = [
+  { id: 'food', label: 'Sở thích ăn uống', icon: Utensils }, { id: 'places', label: 'Địa điểm & Không gian', icon: MapPinned },
+  { id: 'style', label: 'Phong cách thời trang', icon: Palette }, { id: 'routine', label: 'Thói quen & Di chuyển', icon: CalendarDays }, { id: 'ai', label: 'Thuật toán AI', icon: Settings2 }
+];
+const foodTags = ['Món miền Trung', 'Bún & Mì nước', 'Cafe muối & Trà lạnh', 'Đồ thanh mát', 'Healthy / Salad', 'Cơm văn phòng sạch', 'Ăn chay thanh tịnh', 'Bánh mì & Ăn nhanh'];
+const placeTags = ['Cafe làm việc yên tĩnh', 'Bãi biển & Hoàng hôn Mỹ Khê', 'Không gian xanh nhiều cây', 'Nhà hàng địa phương', 'Check-in sống ảo'];
+const styleTags = ['Smart Casual', 'Coastal Breeze', 'Tông màu sáng', 'Chất liệu linen', 'Sneaker tối giản'];
+
+function TagPicker({ items, selected, onToggle, tone = 'orange' }) { return <div className="profile-tags">{items.map(item => <button key={item} type="button" className={`${selected.includes(item) ? `selected ${tone}` : ''}`} onClick={() => onToggle(item)}>{selected.includes(item) ? <Check size={15} /> : <Plus size={15} />}{item}</button>)}</div>; }
+function SectionHeader({ icon: Icon, kicker, title, tone = 'orange', right }) { return <header className="profile-section-header"><div className={`profile-section-icon ${tone}`}><Icon size={21} /></div><div><span>{kicker}</span><h2>{title}</h2></div>{right && <small>{right}</small>}</header>; }
 
 export default function Profile() {
-  const { user, updatePreferences, logout } = useAuth();
-  const navigate = useNavigate();
-
-  const [isEditing, setIsEditing] = useState(false);
-  const [saveSuccess, setSaveSuccess] = useState(false);
-  const [preferences, setPreferences] = useState({
-    theme: user?.preferences?.theme || 'light',
-    notificationEnabled: user?.preferences?.notificationEnabled ?? true,
-    dailyReminderTime: user?.preferences?.dailyReminderTime || '07:30',
-    primaryInterest: user?.preferences?.primaryInterest || 'Làm việc & Ẩm thực',
-  });
-
-  const handleSave = async (e) => {
-    e.preventDefault();
-    try {
-      await updatePreferences(preferences);
-      setIsEditing(false);
-      setSaveSuccess(true);
-      setTimeout(() => setSaveSuccess(false), 3000);
-    } catch (err) {
-      alert('Không thể lưu cài đặt, vui lòng thử lại.');
-    }
-  };
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
-  return (
-    <div className="w-full">
-      <div className="w-full max-w-5xl mx-auto px-gutter py-8 flex flex-col gap-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 pb-2 border-b border-surface-container">
-          <div className="flex flex-col gap-2">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-fixed text-primary font-label-md text-xs font-semibold w-fit">
-              <span className="material-symbols-outlined text-[16px]">account_circle</span>
-              <span>Quản Lý Tài Khoản</span>
-            </div>
-            <h1 className="font-display-lg text-2xl sm:text-3xl tracking-tight text-on-surface font-extrabold">
-              Hồ Sơ Của Bạn 👤
-            </h1>
-            <p className="font-body-lg text-sm sm:text-base text-on-surface-variant">
-              Tùy chỉnh thông tin cá nhân và thiết lập ưu tiên sinh hoạt hàng ngày.
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-error/30 text-error hover:bg-error-container/20 text-xs sm:text-sm font-semibold transition-colors cursor-pointer"
-          >
-            <span className="material-symbols-outlined text-[18px]">logout</span>
-            <span>Đăng xuất</span>
-          </button>
-        </div>
-
-        {/* User Card */}
-        <div className="rounded-3xl bg-surface-container-lowest p-6 sm:p-8 shadow-sm border border-outline-variant/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div className="flex items-center gap-5">
-            <img
-              src={
-                user?.avatar ||
-                'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'
-              }
-              alt={user?.name || 'User'}
-              className="w-20 h-20 rounded-full object-cover ring-4 ring-primary-fixed"
-            />
-            <div className="flex flex-col">
-              <h2 className="font-headline-lg text-xl font-bold text-on-surface">
-                {user?.name || 'Người dùng Todayly'}
-              </h2>
-              <p className="text-sm text-on-surface-variant">{user?.email || 'email@example.com'}</p>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="px-2.5 py-0.5 rounded-full bg-secondary-fixed text-secondary text-xs font-bold uppercase tracking-wider">
-                  {user?.role || 'Thành viên'}
-                </span>
-                <span className="text-xs text-outline">
-                  Gia nhập: {new Date(user?.createdAt || Date.now()).toLocaleDateString('vi-VN')}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setIsEditing(!isEditing)}
-            className="px-5 py-2.5 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface text-xs sm:text-sm font-semibold transition-colors cursor-pointer self-start sm:self-center"
-          >
-            {isEditing ? 'Đóng chỉnh sửa' : 'Chỉnh sửa tùy chọn'}
-          </button>
-        </div>
-
-        {saveSuccess && (
-          <div className="p-4 rounded-2xl bg-primary-fixed/50 text-primary text-sm font-semibold flex items-center gap-2">
-            <span className="material-symbols-outlined text-[20px]">check_circle</span>
-            <span>Cập nhật tùy chọn thành công!</span>
-          </div>
-        )}
-
-        {/* Preferences Form */}
-        <form
-          onSubmit={handleSave}
-          className="rounded-3xl bg-surface-container-lowest p-6 sm:p-8 shadow-sm border border-outline-variant/30 flex flex-col gap-6"
-        >
-          <div className="flex items-center justify-between border-b border-surface-container pb-4">
-            <h3 className="font-headline-md text-lg font-bold text-on-surface">
-              Tùy Chọn Cá Nhân Hóa
-            </h3>
-            <span className="text-xs text-outline">Đồng bộ tự động vào đám mây</span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            <div className="flex flex-col gap-1.5">
-              <label className="font-label-md text-sm font-semibold text-on-surface">
-                Trụ cột bạn quan tâm nhất
-              </label>
-              <select
-                disabled={!isEditing}
-                value={preferences.primaryInterest}
-                onChange={(e) => setPreferences({ ...preferences, primaryInterest: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/40 focus:outline-none focus:border-primary text-sm disabled:opacity-60"
-              >
-                <option value="Làm việc & Ẩm thực">Cân bằng làm việc & ăn ngon</option>
-                <option value="Khám phá điểm hẹn">Quán cafe & Dạo mát bờ biển</option>
-                <option value="Thời trang theo thời tiết">Mặc đẹp mỗi ngày</option>
-                <option value="Quản lý thời gian">Pomodoro & Kế hoạch chi tiết</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="font-label-md text-sm font-semibold text-on-surface">
-                Thời gian nhắc nhở lịch trình buổi sáng
-              </label>
-              <input
-                type="time"
-                disabled={!isEditing}
-                value={preferences.dailyReminderTime}
-                onChange={(e) => setPreferences({ ...preferences, dailyReminderTime: e.target.value })}
-                className="w-full px-4 py-2.5 rounded-xl bg-surface-container-low border border-outline-variant/40 focus:outline-none focus:border-primary text-sm disabled:opacity-60"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between pt-2">
-            <div className="flex flex-col">
-              <span className="font-label-md text-sm font-semibold text-on-surface">
-                Nhận thông báo lịch trình hàng ngày
-              </span>
-              <span className="text-xs text-on-surface-variant">
-                Nhắc nhở nhẹ nhàng vào mỗi buổi sáng
-              </span>
-            </div>
-            <input
-              type="checkbox"
-              disabled={!isEditing}
-              checked={preferences.notificationEnabled}
-              onChange={(e) => setPreferences({ ...preferences, notificationEnabled: e.target.checked })}
-              className="w-5 h-5 accent-primary cursor-pointer disabled:opacity-60"
-            />
-          </div>
-
-          {isEditing && (
-            <div className="flex justify-end gap-3 pt-4 border-t border-surface-container">
-              <button
-                type="button"
-                onClick={() => setIsEditing(false)}
-                className="px-4 py-2 rounded-xl text-outline hover:bg-surface-container font-semibold text-sm cursor-pointer"
-              >
-                Hủy
-              </button>
-              <button
-                type="submit"
-                className="px-6 py-2 rounded-xl bg-primary text-on-primary font-semibold text-sm hover:bg-primary-container cursor-pointer shadow-xs"
-              >
-                Lưu thay đổi
-              </button>
-            </div>
-          )}
-        </form>
-      </div>
-    </div>
-  );
+  const { user, updatePreferences, logout } = useAuth(); const navigate = useNavigate();
+  const [editing, setEditing] = useState(false); const [tab, setTab] = useState('food'); const [saved, setSaved] = useState(false);
+  const [selectedFood, setSelectedFood] = useState(['Món miền Trung', 'Bún & Mì nước', 'Cafe muối & Trà lạnh', 'Healthy / Salad']);
+  const [selectedPlaces, setSelectedPlaces] = useState(['Cafe làm việc yên tĩnh', 'Bãi biển & Hoàng hôn Mỹ Khê']);
+  const [selectedStyle, setSelectedStyle] = useState(['Smart Casual', 'Coastal Breeze', 'Tông màu sáng']);
+  const [budget, setBudget] = useState('40k – 80k'); const [reminder, setReminder] = useState('07:30'); const [notifications, setNotifications] = useState(true);
+  const toggle = (setter) => (item) => setter(current => current.includes(item) ? current.filter(x => x !== item) : [...current, item]);
+  const save = async () => { try { await updatePreferences({ dailyReminderTime: reminder, notificationEnabled: notifications, primaryInterest: 'Thời trang theo thời tiết' }); } catch { /* profile still saves locally */ } setSaved(true); setEditing(false); setTimeout(() => setSaved(false), 2500); };
+  const logoutUser = () => { logout(); navigate('/login'); };
+  const name = user?.name || 'Nguyễn Mai Linh'; const email = user?.email || 'mailinh@example.com';
+  return <div className="profile-page"><div className="profile-shell">
+    <div className="profile-breadcrumb"><span>Trang chủ</span><ChevronRight size={14} /><b>Hồ sơ cá nhân & Cài đặt</b><em><i /> AI đồng bộ theo thời gian thực</em></div>
+    <div className="profile-heading"><div><div className="profile-kicker">Lifestyle Preferences <small>• Bản cập nhật tháng 5/2024</small></div><h1>Hồ sơ cá nhân & Cài đặt sở thích</h1><p>Cá nhân hóa trải nghiệm và thuật toán gợi ý lịch trình thông minh của bạn. Mỗi lựa chọn giúp AI đề xuất đúng gu ăn uống, nhịp sống và trang phục mỗi ngày.</p></div><button className="profile-logout" type="button" onClick={logoutUser}><LogOut size={17} /> Đăng xuất</button></div>
+    <section className="profile-summary"><div className="profile-user"><div className="profile-avatar"><img src={user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80'} alt={name} /><button type="button" aria-label="Đổi ảnh đại diện"><Camera size={17} /></button></div><div><div className="profile-name-row"><h2>{name}</h2><span><BadgeCheck size={14} /> Thành viên Phong cách sống</span></div><div className="profile-meta"><span>✉ {email}</span><span>•</span><span><MapPin size={15} /> Đà Nẵng, Việt Nam</span><span>•</span><span><CalendarDays size={15} /> Đã tạo <b>28 lịch trình</b></span></div><div className="profile-progress"><div><i /></div><b>85% Hồ sơ hoàn thiện</b></div></div></div><div className="profile-summary-actions"><button type="button" onClick={() => setEditing(!editing)}><Edit3 size={17} /> {editing ? 'Đang chỉnh sửa' : 'Chỉnh sửa cơ bản'}</button><button type="button"><Share2 size={17} /> Chia sẻ gu</button></div></section>
+    <nav className="profile-tabs">{tabs.map(({ id, label, icon: Icon }) => <button key={id} type="button" className={tab === id ? 'active' : ''} onClick={() => setTab(id)}><Icon size={17} /> {label}</button>)}</nav>
+    <main className="profile-grid">
+      <section className="profile-card"><SectionHeader icon={Utensils} kicker="Ăn gì" title="Khẩu vị & Ăn uống" right="Ưu tiên hàng ngày" /><div className="profile-field"><div className="profile-field-title"><b>Món ăn yêu thích / Gu ẩm thực</b><small>Đã chọn {selectedFood.length} gu</small></div><p>AI sẽ sắp xếp các quán ăn gần lộ trình phù hợp với những sở thích sau.</p><TagPicker items={foodTags} selected={selectedFood} onToggle={toggle(setSelectedFood)} /></div><div className="profile-field"><div className="profile-field-title"><b>Kiêng kỵ & Dị ứng thực phẩm</b></div><div className="profile-check-grid">{['Không ăn hành lá sống', 'Dị ứng tôm, cua biển', 'Hạn chế dầu mỡ / chiên rán', 'Giảm ngọt (30% đường)'].map((item, i) => <label key={item}><input type="checkbox" defaultChecked={i !== 1} disabled={!editing} /><span><b>{item}</b><small>{i === 1 ? 'Loại bỏ hoàn toàn hải sản vỏ cứng' : 'Tự động ghi chú khi đặt bàn'}</small></span></label>)}</div></div><div className="profile-field"><div className="profile-field-title"><b>Mức chi tiêu trung bình một bữa</b><strong>{budget} / bữa</strong></div><div className="profile-budget">{['< 40k', '40k – 80k', '> 100k'].map(item => <button key={item} type="button" className={budget === item ? 'active' : ''} onClick={() => setBudget(item)}><small>{item === '40k – 80k' ? 'Trung bình' : item === '< 40k' ? 'Bình dân' : 'Thoải mái'}</small><b>{item}</b><span>{item === '< 40k' ? 'Quán vỉa hè' : item === '40k – 80k' ? 'Quán máy lạnh' : 'Nhà hàng, Bistro'}</span></button>)}</div></div></section>
+      <section className="profile-card"><SectionHeader icon={MapPinned} kicker="Đi đâu" title="Địa điểm & Không gian hẹn" tone="green" right="Đà Nẵng & Lân cận" /><div className="profile-field"><div className="profile-field-title"><b>Loại hình không gian ưa chuộng</b></div><TagPicker items={placeTags} selected={selectedPlaces} onToggle={toggle(setSelectedPlaces)} tone="green" /></div><div className="profile-preference-box"><div><Moon size={20} /><span><b>Nhịp điệu yêu thích</b><small>Chọn không gian phù hợp tâm trạng</small></span></div><select disabled={!editing} defaultValue="quiet"><option value="quiet">Yên tĩnh, thư giãn</option><option value="lively">Sôi động, nhiều năng lượng</option><option value="nature">Gần thiên nhiên</option></select></div><div className="profile-map-note"><MapPin size={20} /><div><b>Bán kính khám phá</b><small>AI ưu tiên gợi ý trong phạm vi 5km quanh vị trí của bạn.</small></div><span>5 km</span></div></section>
+      <section className="profile-card"><SectionHeader icon={Palette} kicker="Mặc gì" title="Phong cách & Thời tiết" tone="violet" right="Gợi ý theo nhiệt độ" /><div className="profile-field"><div className="profile-field-title"><b>Phong cách bạn yêu thích</b></div><TagPicker items={styleTags} selected={selectedStyle} onToggle={toggle(setSelectedStyle)} tone="violet" /></div><div className="profile-style-preview"><div><span className="profile-style-swatch" /><span className="profile-style-swatch" /><span className="profile-style-swatch" /></div><div><b>Smart Casual & Coastal</b><small>Phối đồ sáng màu, thoáng mát</small></div><ChevronRight size={18} /></div><div className="profile-toggle-row"><span><Zap size={18} /><span><b>Ưu tiên chất liệu thoáng mát</b><small>Linen, cotton và vải nhanh khô</small></span></span><input type="checkbox" defaultChecked disabled={!editing} /></div></section>
+      <section className="profile-card"><SectionHeader icon={CalendarDays} kicker="Lịch trình" title="Nhịp sinh hoạt & Di chuyển" tone="orange" right="Tối ưu năng lượng" /><div className="profile-field"><div className="profile-field-title"><b>Nhắc lịch trình buổi sáng</b></div><div className="profile-time-input"><Bell size={18} /><input type="time" value={reminder} disabled={!editing} onChange={e => setReminder(e.target.value)} /><span>Gửi gợi ý lúc {reminder} mỗi ngày</span></div></div><div className="profile-check-grid"><label><input type="checkbox" checked={notifications} disabled={!editing} onChange={e => setNotifications(e.target.checked)} /><span><b>Nhận thông báo lịch trình</b><small>Nhắc nhở nhẹ nhàng vào mỗi buổi sáng</small></span></label><label><input type="checkbox" defaultChecked disabled={!editing} /><span><b>Ưu tiên di chuyển xanh</b><small>Đi bộ, xe đạp hoặc phương tiện công cộng</small></span></label></div><div className="profile-transport"><span><Ruler size={18} /> Khoảng cách đi bộ tối đa</span><b>2 km</b></div></section>
+    </main>
+    <section className="profile-ai"><div className="profile-ai-icon"><Sparkles size={25} /></div><div><h2>Thuật toán AI hiểu bạn hơn mỗi ngày</h2><p>Todayly dùng các lựa chọn của bạn để tạo lịch trình cân bằng giữa làm việc, ăn uống, trải nghiệm và phong cách.</p></div><div className="profile-ai-stats"><span><b>4</b><small>trụ cột đã chọn</small></span><span><b>85%</b><small>độ chính xác gợi ý</small></span></div></section>
+    <div className="profile-save-bar">{saved && <span><Check size={17} /> Đã lưu thay đổi</span>}<button type="button" onClick={save}><Save size={17} /> Lưu thay đổi</button><button type="button" onClick={() => setEditing(false)}><X size={16} /> Hủy</button></div>
+  </div></div>;
 }

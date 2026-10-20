@@ -1,13 +1,49 @@
 import api from './api';
-import { mockOutfits } from '../data/mockOutfits';
 
 export const outfitService = {
-  getAll: async () => {
+  getAll: async (params = {}) => {
     try {
-      const res = await api.get('/outfits');
-      return (res.data && res.data.length > 0) ? res.data : mockOutfits;
-    } catch {
-      return mockOutfits;
+      const res = await api.get('/outfits', { params: { limit: 100, ...params } });
+      return res.data;
+    } catch (error) {
+      console.warn('Lỗi tải dữ liệu outfits:', error);
+      return { count: 0, outfits: [], timeline: {} };
     }
-  }
+  },
+
+  getByActivity: async (activity, params = {}) => {
+    try {
+      const res = await api.get('/outfits', { params: { activity, ...params } });
+      return res.data?.outfits || [];
+    } catch {
+      return [];
+    }
+  },
+
+  getTimeline: async () => {
+    try {
+      const res = await api.get('/outfits/timeline');
+      return res.data;
+    } catch {
+      return null;
+    }
+  },
+
+  getById: async (id) => {
+    try {
+      const res = await api.get(`/outfits/${id}`);
+      return res.data;
+    } catch {
+      return null;
+    }
+  },
+
+  crawlNew: async () => {
+    try {
+      const res = await api.post('/outfits/crawl');
+      return res.data;
+    } catch (error) {
+      throw error;
+    }
+  },
 };

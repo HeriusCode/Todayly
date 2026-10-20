@@ -1,213 +1,616 @@
-import React, { useState } from 'react';
-import { mockOutfits } from '../../data/mockOutfits';
-import OutfitCard from '../../components/outfit/OutfitCard';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ArrowRight,
+  Bookmark,
+  CalendarPlus,
+  Check,
+  CheckCircle2,
+  CloudSun,
+  Droplets,
+  Heart,
+  RefreshCw,
+  Shirt,
+  Sparkles,
+  Sun,
+  Umbrella,
+  Wind,
+  Zap,
+} from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
+import { outfitService } from '../../services/outfitService';
+import { scheduleService } from '../../services/scheduleService';
+import { weatherService } from '../../services/weatherService';
+import { toDateKey } from '../../utils/dates';
+
+const activities = [
+  { id: 'cafe', icon: '☕', label: 'Đi cafe sống ảo' },
+  { id: 'office', icon: '💼', label: 'Đi làm văn phòng' },
+  { id: 'street', icon: '👟', label: 'Đi chơi phố' },
+  { id: 'date', icon: '🌹', label: 'Hẹn hò lãng mạn' },
+  { id: 'beach', icon: '🏖️', label: 'Đi biển & Dã ngoại' },
+  { id: 'sport', icon: '🏃', label: 'Thể thao & Tập luyện' },
+  { id: 'party', icon: '✨', label: 'Tiệc tùng & Sự kiện' },
+  { id: 'school', icon: '🎓', label: 'Đi học & Giảng đường' },
+];
+
+const initialSaved = () => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem('todayly_saved_outfits') || '[]'));
+  } catch {
+    return new Set();
+  }
+};
+
+const getClimateAdvice = (temp, condition = '') => {
+  const isRain = /mưa|phùn|dông|rào/i.test(condition);
+  if (isRain) {
+    return 'Hôm nay trời có mưa: Ưu tiên áo khoác gió trượt nước, quần ống gọn gàng và giày kháng ẩm.';
+  }
+  if (temp >= 32) {
+    return 'Thời tiết nắng nóng gay gắt: Khuyên dùng chất liệu linen, đũi hoặc cotton 100% thoáng mát, đội mũ và thoa kem chống nắng SPF50+.';
+  }
+  if (temp >= 26) {
+    return 'Thời tiết ấm áp lý tưởng: Thích hợp cho các gam màu sáng pastel, chất vải nhẹ nhàng thoáng khí.';
+  }
+  if (temp >= 20) {
+    return 'Thời tiết mát mẻ dễ chịu: Phối đồ layer nhẹ nhàng với sơ mi, cardigan hoặc blazer mỏng.';
+  }
+  return 'Thời tiết se lạnh: Hãy giữ ấm cơ thể với áo len dệt kim, áo khoác măng tô hoặc khăn choàng nhẹ.';
+};
+
+function TimelineCard({ outfit, time, title, label, temp, text, tone, onSelect }) {
+  if (!outfit) return null;
+  return (
+    <article className="outfit-timeline-card" onClick={onSelect} style={{ cursor: 'pointer' }}>
+      <div className="outfit-timeline-image">
+        <img
+          src={outfit.image}
+          alt={outfit.styleName}
+          onError={(e) => {
+            e.currentTarget.onerror = null;
+            e.currentTarget.src =
+              'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?auto=format&fit=crop&w=800&q=80';
+          }}
+        />
+        <span className={`outfit-time-pill ${tone || 'violet'}`}>
+          <i />
+          {time || outfit.timelineInfo?.timeRange || 'Trong ngày'}
+        </span>
+        <b>{temp || outfit.timelineInfo?.tempLabel || `${outfit.tempRange?.min || 25}°C`}</b>
+      </div>
+      <div className="outfit-timeline-copy">
+        <div>
+          <strong>{label || outfit.timelineInfo?.label || outfit.activityLabel}</strong>
+          <small>{outfit.styleName}</small>
+        </div>
+        <h3>{title || outfit.styleName}</h3>
+        <p>{text || outfit.timelineInfo?.summary || outfit.suitableFor}</p>
+      </div>
+      <button type="button" aria-label={`Xem ${outfit.styleName}`} onClick={onSelect}>
+        <ArrowRight size={17} />
+      </button>
+    </article>
+  );
+}
 
 export default function Outfit() {
-  const outfits = mockOutfits && mockOutfits.length > 0 ? mockOutfits : [
-    {
-      id: 'o-1',
-      styleName: 'Smart-Casual Thoải Mái',
-      weatherCondition: 'Nắng nhẹ • 29°C • Gió mát ven biển',
-      suitableFor: 'Làm việc linh hoạt & Cà phê chiều',
-      colorPalette: ['#ffffff', '#e5eeff', '#d3e4fe', '#fd761a'],
-      colorNames: ['Trắng cotton', 'Xanh pastel', 'Denim sáng', 'Cam accent'],
-      items: [
-        { category: 'Áo trên', name: 'Áo sơ mi đũi cộc tay', icon: 'apparel', note: 'Chất liệu thoáng khí, thấm hút mồ hôi' },
-        { category: 'Quần', name: 'Quần Chinos ống suông màu be', icon: 'straighten', note: 'Form rộng rãi, tôn dáng dễ di chuyển' },
-        { category: 'Giày', name: 'Sneaker trắng tối giản', icon: 'steps', note: 'Êm ái cho mục tiêu 6.000 bước đi bộ' },
-        { category: 'Phụ kiện', name: 'Đồng hồ dây da & Kính râm', icon: 'watch', note: 'Bảo vệ mắt dưới nắng dịu Đà Nẵng' }
-      ],
-      tips: 'Xịt nhẹ nước hoa hương cam chanh hoặc gỗ tuyết tùng thoang thoảng để duy trì cảm giác sảng khoái suốt ngày dài.',
-    },
-    {
-      id: 'o-2',
-      styleName: 'Minimalist Năng Động',
-      weatherCondition: 'Trời trong • Nắng ráo 30°C',
-      suitableFor: 'Đi lại nhiều & Gặp gỡ bạn bè',
-      colorPalette: ['#1e293b', '#64748b', '#cbd5e1', '#ffffff'],
-      colorNames: ['Xanh than', 'Xám ghi', 'Trắng sữa', 'Bạc kim'],
-      items: [
-        { category: 'Áo trên', name: 'Áo thun Polo dệt kim cao cấp', icon: 'apparel', note: 'Cổ bẻ lịch sự nhưng vẫn trẻ trung' },
-        { category: 'Quần', name: 'Quần Tây cropped xắn gấu', icon: 'straighten', note: 'Chiều dài trên mắt cá chân thoáng mát' },
-        { category: 'Giày', name: 'Loafer da lộn màu nâu đất', icon: 'steps', note: 'Dễ xỏ tháo, phong thái nhẹ nhàng' },
-        { category: 'Phụ kiện', name: 'Túi tote vải canvas mộc', icon: 'shopping_bag', note: 'Đựng vừa laptop và sổ tay cá nhân' }
-      ],
-      tips: 'Nên chuẩn bị thêm một chiếc áo khoác gió mỏng nhẹ nếu có kế hoạch di chuyển qua bán đảo Sơn Trà vào lúc chiều muộn.',
-    },
-    {
-      id: 'o-3',
-      styleName: 'Chilling Nghỉ Ngơi Cuối Ngày',
-      weatherCondition: 'Hoàng hôn biển mát lành • 27°C',
-      suitableFor: 'Dạo biển Mỹ Khê & Ăn tối thư thái',
-      colorPalette: ['#f8fafc', '#fed7aa', '#ea580c', '#334155'],
-      colorNames: ['Trắng kem', 'Cam đào', 'Đất nung', 'Xanh đậm'],
-      items: [
-        { category: 'Áo trên', name: 'Áo phông Oversize cotton 100%', icon: 'apparel', note: 'Rộng rãi tối đa, cực kỳ dễ chịu' },
-        { category: 'Quần', name: 'Quần Short linen đũi cạp chun', icon: 'straighten', note: 'Thoáng đãng hoàn hảo bên bờ biển' },
-        { category: 'Giày', name: 'Sandal quai chéo thể thao', icon: 'steps', note: 'Không ngại cát biển, dễ chịu tuyệt đối' },
-        { category: 'Phụ kiện', name: 'Mũ lưỡi trai phong cách vintage', icon: 'sports_baseball', note: 'Điểm nhấn cá tính, chống gió chiều' }
-      ],
-      tips: 'Trang phục này cực kỳ ăn ảnh khi check-in vào khung giờ vàng từ 17:00 đến 18:00 bên bờ biển.',
-    }
-  ];
+  const { isAuthenticated } = useAuth();
+  const navigate = useNavigate();
 
-  const [selectedOutfit, setSelectedOutfit] = useState(outfits[0]);
-  const [savedOutfits, setSavedOutfits] = useState({});
+  const [allOutfits, setAllOutfits] = useState([]);
+  const [timelineData, setTimelineData] = useState(null);
+  const [activity, setActivity] = useState('cafe');
+  const [outfitIndex, setOutfitIndex] = useState(0);
+  const [savedOutfits, setSavedOutfits] = useState(initialSaved);
+  const [weather, setWeather] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
 
-  const toggleSave = (id) => {
-    setSavedOutfits((prev) => ({ ...prev, [id]: !prev[id] }));
+  // Load real weather and real outfits from MongoDB Atlas
+  useEffect(() => {
+    let active = true;
+
+    // 1. Fetch live weather for device/IP
+    weatherService
+      .getCurrentForDevice()
+      .then((data) => {
+        if (active && data) setWeather(data);
+      })
+      .catch(() => {});
+
+    // 2. Fetch real outfits from MongoDB database
+    outfitService
+      .getAll()
+      .then((data) => {
+        if (!active) return;
+        const outfitsList = Array.isArray(data?.outfits) ? data.outfits : [];
+        setAllOutfits(outfitsList);
+        if (data?.timeline) {
+          setTimelineData(data.timeline);
+        }
+      })
+      .catch((err) => {
+        console.warn('Lỗi tải outfits:', err);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Filter outfits matching currently selected activity
+  const matchingOutfits = useMemo(() => {
+    const list = allOutfits.filter((o) => o.activity === activity);
+    return list.length ? list : allOutfits;
+  }, [allOutfits, activity]);
+
+  // Selected outfit currently showcased
+  const selected = useMemo(() => {
+    if (!matchingOutfits.length) return null;
+    return matchingOutfits[outfitIndex % matchingOutfits.length];
+  }, [matchingOutfits, outfitIndex]);
+
+  // Reset index when activity tab changes
+  useEffect(() => {
+    setOutfitIndex(0);
+  }, [activity]);
+
+  // Cycle to next outfit recommendation for current activity
+  const nextSuggestion = () => {
+    setRefreshing(true);
+    setOutfitIndex((prev) => prev + 1);
+    setTimeout(() => setRefreshing(false), 400);
   };
 
-  const isSaved = !!savedOutfits[selectedOutfit.id];
+  // Force re-crawl fresh outfits into MongoDB
+  const crawlFreshOutfits = async () => {
+    setRefreshing(true);
+    try {
+      const data = await outfitService.getAll({ refresh: 'true' });
+      const outfitsList = Array.isArray(data?.outfits) ? data.outfits : [];
+      setAllOutfits(outfitsList);
+      if (data?.timeline) setTimelineData(data.timeline);
+      setToastMessage('Đã cập nhật các set đồ thời trang mới nhất từ cơ sở dữ liệu!');
+      setTimeout(() => setToastMessage(''), 4000);
+    } catch {
+      setToastMessage('Không thể làm mới dữ liệu trang phục.');
+      setTimeout(() => setToastMessage(''), 4000);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Toggle save outfit to closet
+  const toggleSave = (outfitId) => {
+    if (!outfitId) return;
+    setSavedOutfits((current) => {
+      const next = new Set(current);
+      if (next.has(outfitId)) {
+        next.delete(outfitId);
+        setToastMessage('Đã bỏ lưu outfit khỏi tủ đồ.');
+      } else {
+        next.add(outfitId);
+        setToastMessage('Đã lưu outfit vào tủ đồ của bạn! ✨');
+      }
+      localStorage.setItem('todayly_saved_outfits', JSON.stringify([...next]));
+      setTimeout(() => setToastMessage(''), 3500);
+      return next;
+    });
+  };
+
+  // Add selected outfit to daily schedule planner
+  const addToSchedule = async (outfit) => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    if (!outfit) return;
+    try {
+      await scheduleService.addItem({
+        title: `Chuẩn bị trang phục: ${outfit.styleName}`,
+        scheduledDate: toDateKey(),
+        startTime: '07:30',
+        endTime: '08:00',
+        type: 'outfit',
+        category: 'Cá nhân',
+        priority: 'medium',
+        matrixQuadrant: 'important_not_urgent',
+        location: outfit.suitableFor || 'Tại nhà',
+        note: `Set đồ gồm: ${outfit.pieces?.map((p) => p.name).join(', ')}. Mẹo: ${outfit.tips || ''}`,
+        badge: 'Outfit hôm nay',
+        color: 'primary',
+      });
+      setToastMessage(`Đã thêm “${outfit.styleName}” vào lịch trình hôm nay!`);
+      setTimeout(() => setToastMessage(''), 4000);
+    } catch (error) {
+      setToastMessage(error.response?.data?.message || 'Không thể thêm outfit vào lịch trình.');
+      setTimeout(() => setToastMessage(''), 4000);
+    }
+  };
+
+  const isCurrentSaved = selected ? savedOutfits.has(selected.id || selected._id) : false;
+
+  // Real weather metrics
+  const currentTemp = weather?.temperature ?? 28;
+  const currentCondition = weather?.condition || 'Trời quang, thoáng mát';
+  const currentLocation = weather?.location || 'Vị trí hiện tại';
+  const currentHumidity = weather?.humidity ? `${weather.humidity}%` : '65%';
+  const currentWind = weather?.windSpeed ? `${weather.windSpeed} km/h` : '12 km/h';
+  const currentUv = currentTemp >= 30 ? '7.5 · Khá cao' : '4.5 · Trung bình';
+  const climateAdvice = getClimateAdvice(currentTemp, currentCondition);
 
   return (
-    <div className="w-full">
-      <div className="w-full max-w-7xl mx-auto px-gutter py-8 flex flex-col gap-8">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 pb-2 border-b border-surface-container">
-          <div className="flex flex-col gap-2 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-fixed text-primary font-label-md text-xs font-semibold w-fit">
-              <span className="material-symbols-outlined text-[16px]">checkroom</span>
-              <span>Trụ cột Mặc gì • Tự tin & Hài hòa thời tiết</span>
-            </div>
-            <h1 className="font-display-lg text-2xl sm:text-3xl tracking-tight text-on-surface font-extrabold">
-              Hôm nay mặc gì? ✨
-            </h1>
-            <p className="font-body-lg text-sm sm:text-base text-on-surface-variant">
-              Gợi ý phối đồ thoáng mát, chuẩn form theo nhiệt độ 29°C và lịch trình di chuyển trong ngày của bạn.
-            </p>
-          </div>
+    <div className="outfit-page">
+      <div className="outfit-shell">
+        {/* Hero Section with Live Weather */}
+        <section className="outfit-hero outfit-enter">
+          <span className="outfit-orb outfit-orb-a" />
+          <span className="outfit-orb outfit-orb-b" />
 
-          <div className="flex items-center gap-3 bg-surface-container-lowest p-3.5 rounded-2xl shadow-xs border border-outline-variant/20">
-            <div className="w-10 h-10 rounded-xl bg-primary-fixed/50 text-primary flex items-center justify-center">
-              <span className="material-symbols-outlined text-[22px]">wb_sunny</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="font-label-sm text-xs text-outline uppercase tracking-wider">
-                Thời tiết hiện tại
+          <div className="outfit-hero-top">
+            <div>
+              <span className="outfit-eyebrow">
+                <Shirt size={16} /> Trợ lý thời trang thông minh
               </span>
-              <span className="font-headline-sm text-sm font-bold text-on-surface">
-                29°C • Nắng khô dịu
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Selected Outfit Showcase */}
-        <div className="rounded-3xl bg-surface-container-lowest p-6 sm:p-8 shadow-sm flex flex-col gap-8 border border-outline-variant/30">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-surface-container pb-6">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-2">
-                <span className="px-3 py-1 rounded-full bg-primary-fixed text-primary font-label-sm text-xs font-bold uppercase tracking-wider">
-                  Gợi ý hàng đầu
-                </span>
-                <span className="text-secondary font-label-sm text-xs font-semibold">
-                  {selectedOutfit.weatherCondition}
-                </span>
-              </div>
-              <h2 className="font-headline-lg text-xl sm:text-2xl text-on-surface font-extrabold mt-1">
-                {selectedOutfit.styleName}
-              </h2>
-              <p className="font-body-md text-sm text-on-surface-variant">
-                Mục đích: {selectedOutfit.suitableFor}
+              <h1>
+                Hôm nay mặc gì? <span>👕👗</span>
+              </h1>
+              <p>
+                Gợi ý outfit thật từ hệ thống thời trang, cá nhân hóa theo thời tiết thực tế và hoạt động trong ngày của bạn.
               </p>
             </div>
-
-            <button
-              type="button"
-              onClick={() => toggleSave(selectedOutfit.id)}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-surface-container hover:bg-surface-container-high text-on-surface font-label-md text-sm transition-colors cursor-pointer self-start sm:self-center"
-            >
-              <span
-                className={`material-symbols-outlined text-[18px] ${
-                  isSaved ? 'text-primary' : ''
-                }`}
-              >
-                {isSaved ? 'bookmark' : 'bookmark_border'}
-              </span>
-              <span>{isSaved ? 'Đã lưu' : 'Lưu set đồ'}</span>
-            </button>
+            <div className="outfit-live">
+              <i />
+              <div>
+                <small>Đồng bộ theo thời gian thực</small>
+                <strong>{currentLocation} · Hôm nay</strong>
+              </div>
+            </div>
           </div>
 
-          {/* Clothing Items Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {selectedOutfit.items?.map((item, idx) => (
-              <div
-                key={idx}
-                className="p-5 rounded-2xl bg-surface-container-low flex flex-col gap-3 border border-outline-variant/20 hover:shadow-xs transition-all"
-              >
-                <div className="w-12 h-12 rounded-xl bg-surface-container-lowest text-primary flex items-center justify-center shadow-2xs">
-                  <span className="material-symbols-outlined text-[24px]">
-                    {item.icon}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-label-sm text-xs text-outline uppercase font-semibold">
-                    {item.category}
-                  </span>
-                  <h4 className="font-headline-sm text-sm font-bold text-on-surface mt-0.5">
-                    {item.name}
-                  </h4>
-                  <p className="font-body-sm text-xs text-on-surface-variant mt-1">
-                    {item.note}
-                  </p>
-                </div>
+          <div className="outfit-weather-grid">
+            <div className="outfit-weather-main">
+              <div>
+                <small>KHÍ HẬU HIỆN TẠI</small>
+                <strong>
+                  {currentTemp}°C <em>{currentCondition}</em>
+                </strong>
+                <p>{climateAdvice}</p>
               </div>
+              <span>
+                <Sun size={34} />
+              </span>
+            </div>
+
+            <div className="outfit-metrics">
+              <div>
+                <Umbrella />
+                <small>
+                  Thời tiết
+                  <strong>{currentCondition}</strong>
+                </small>
+              </div>
+              <div>
+                <Droplets />
+                <small>
+                  Độ ẩm
+                  <strong>{currentHumidity} · Thoải mái</strong>
+                </small>
+              </div>
+              <div>
+                <Zap />
+                <small>
+                  Chỉ số UV
+                  <strong>{currentUv}</strong>
+                </small>
+              </div>
+              <div>
+                <Wind />
+                <small>
+                  Gió tự nhiên
+                  <strong>{currentWind} · Mát dịu</strong>
+                </small>
+              </div>
+            </div>
+          </div>
+
+          <div className="outfit-warning">
+            <Sparkles size={18} />
+            <span>
+              <b>Lời khuyên thời trang:</b> {climateAdvice}
+            </span>
+          </div>
+        </section>
+
+        {/* Activity Selection Chips */}
+        <section className="outfit-activities outfit-enter outfit-delay-1">
+          <header>
+            <div>
+              <Sparkles size={21} />
+              <h2>Hôm nay bạn chuẩn bị đi đâu / làm gì?</h2>
+            </div>
+            <span>Chọn ngữ cảnh để phối màu và phom dáng chuẩn gu</span>
+          </header>
+
+          <div className="outfit-chips">
+            {activities.map((item) => (
+              <button
+                key={item.id}
+                className={activity === item.id ? 'active' : ''}
+                onClick={() => setActivity(item.id)}
+                type="button"
+              >
+                <span>{item.icon}</span>
+                {item.label}
+                {activity === item.id && <Check size={14} />}
+              </button>
             ))}
           </div>
+        </section>
 
-          {/* Palette & Tips */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-surface-container">
-            <div className="flex flex-col gap-2">
-              <span className="font-label-sm text-xs text-outline uppercase font-bold tracking-wider">
-                Bảng màu gợi ý cho set đồ
-              </span>
-              <div className="flex items-center gap-3">
-                {selectedOutfit.colorPalette?.map((color, idx) => (
-                  <div key={idx} className="flex flex-col items-center gap-1">
-                    <div
-                      className="w-12 h-12 rounded-2xl shadow-2xs border border-outline-variant/40"
-                      style={{ backgroundColor: color }}
-                    />
-                    <span className="font-label-sm text-xs text-on-surface-variant">
-                      {selectedOutfit.colorNames?.[idx] || color}
-                    </span>
+        {/* Main Outfit Showcase: Loaded from Real MongoDB Data */}
+        {selected ? (
+          <section className="outfit-showcase outfit-enter outfit-delay-2">
+            <div className="outfit-editorial">
+              <div className="outfit-photo">
+                <img
+                  src={selected.image}
+                  alt={selected.styleName}
+                  onError={(e) => {
+                    e.currentTarget.onerror = null;
+                    e.currentTarget.src =
+                      'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?auto=format&fit=crop&w=1000&q=85';
+                  }}
+                />
+                <span>
+                  <Sparkles size={14} /> Gợi ý từ cơ sở dữ liệu thời trang
+                </span>
+                <button
+                  type="button"
+                  onClick={() => toggleSave(selected.id || selected._id)}
+                  aria-label={isCurrentSaved ? 'Bỏ lưu outfit' : 'Lưu outfit'}
+                >
+                  <Heart size={20} fill={isCurrentSaved ? 'currentColor' : 'none'} />
+                </button>
+              </div>
+
+              {selected.colorPalette?.length > 0 && (
+                <div className="outfit-palette">
+                  <div>
+                    <small>BẢNG MÀU HÔM NAY</small>
+                    {selected.colorPalette.map((color, idx) => (
+                      <i
+                        key={idx}
+                        style={{ background: color }}
+                        title={selected.colorNames?.[idx] || color}
+                      />
+                    ))}
+                  </div>
+                  <span>
+                    {selected.colorNames?.slice(0, 3).join(' • ') || 'Phối màu chuẩn phong cách'}
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="outfit-details">
+              <div className="outfit-detail-head">
+                <div>
+                  <span>GỢI Ý HÀNG ĐẦU ({matchingOutfits.indexOf(selected) + 1}/{matchingOutfits.length})</span>
+                  <h2>{selected.styleName}</h2>
+                  <p>Phù hợp: {selected.suitableFor}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => toggleSave(selected.id || selected._id)}
+                  className={isCurrentSaved ? 'saved' : ''}
+                >
+                  <Bookmark size={18} fill={isCurrentSaved ? 'currentColor' : 'none'} />
+                  {isCurrentSaved ? 'Đã lưu vào tủ đồ' : 'Lưu set đồ'}
+                </button>
+              </div>
+
+              {/* Pieces Grid */}
+              <div className="outfit-piece-grid">
+                {selected.pieces?.map((piece, idx) => (
+                  <div key={piece.name || idx}>
+                    <span className="material-symbols-outlined">{piece.icon || 'dry_cleaning'}</span>
+                    <small>{piece.category || 'MÓN ĐỒ'}</small>
+                    <strong>{piece.name}</strong>
+                    <p>{piece.note}</p>
                   </div>
                 ))}
               </div>
-            </div>
 
-            <div className="p-4 rounded-2xl bg-surface-container-low flex flex-col gap-1.5 justify-center">
-              <span className="font-label-sm text-xs text-secondary font-bold uppercase tracking-wider flex items-center gap-1">
-                <span className="material-symbols-outlined text-[16px]">
-                  tips_and_updates
-                </span>
-                Lời khuyên thời trang hôm nay
-              </span>
-              <p className="font-body-sm text-sm text-on-surface-variant">
-                {selectedOutfit.tips}
+              {/* Pro Styling Tip */}
+              {selected.tips && (
+                <div className="outfit-tip">
+                  <Sparkles size={19} />
+                  <p>
+                    <b>Mẹo phối đồ hôm nay: </b>
+                    {selected.tips}
+                  </p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="outfit-actions">
+                <button
+                  type="button"
+                  onClick={nextSuggestion}
+                  className="primary"
+                  title="Xem set đồ khác cùng danh mục"
+                >
+                  <Sparkles size={18} className={refreshing ? 'spin' : ''} /> Gợi ý outfit khác
+                </button>
+                <button
+                  type="button"
+                  onClick={() => addToSchedule(selected)}
+                  className="warm"
+                  style={{ background: '#3525cd', color: '#fff' }}
+                >
+                  <CalendarPlus size={17} /> Thêm vào lịch trình hôm nay
+                </button>
+                <button
+                  type="button"
+                  onClick={crawlFreshOutfits}
+                  title="Cào và làm mới dữ liệu từ server"
+                >
+                  <RefreshCw size={17} className={refreshing ? 'spin' : ''} /> Cập nhật dữ liệu
+                </button>
+              </div>
+            </div>
+          </section>
+        ) : (
+          <div
+            style={{
+              padding: '60px 20px',
+              textAlign: 'center',
+              background: '#fff',
+              borderRadius: '24px',
+              border: '1px dashed #cbd5e1',
+              margin: '20px 0',
+            }}
+          >
+            {loading ? (
+              <p style={{ color: '#64748b', fontSize: '14px', fontWeight: 600 }}>
+                Đang tải dữ liệu outfit thật từ database MongoDB…
               </p>
+            ) : (
+              <div>
+                <p style={{ color: '#1e293b', fontSize: '16px', fontWeight: 700 }}>
+                  Chưa có gợi ý outfit cho hoạt động này.
+                </p>
+                <button
+                  type="button"
+                  onClick={crawlFreshOutfits}
+                  style={{
+                    marginTop: '12px',
+                    padding: '10px 20px',
+                    background: '#3525cd',
+                    color: '#fff',
+                    borderRadius: '99px',
+                    border: 'none',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Cào dữ liệu trang phục mới
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Daily Timeline Section: Morning, Afternoon, Evening */}
+        <section className="outfit-timeline outfit-enter outfit-delay-3">
+          <header>
+            <div>
+              <h2>Tủ đồ theo từng nhịp thời gian trong ngày</h2>
+              <p>Linh hoạt biến đổi outfit theo từng giai đoạn nhiệt độ và ánh sáng trong ngày.</p>
+            </div>
+            <span>
+              <CloudSun size={16} /> Đồng bộ theo diễn biến thời tiết
+            </span>
+          </header>
+
+          <div className="outfit-timeline-grid">
+            <TimelineCard
+              outfit={timelineData?.morning || allOutfits[0]}
+              time="Buổi sáng · 07:30 – 11:30"
+              title="Thanh lịch & chỉn chu đầu ngày"
+              label="ĐI LÀM & ĐI HỌC"
+              temp={`${Math.round(currentTemp - 2)}°C · Nắng dịu`}
+              tone="violet"
+              onSelect={() => {
+                const item = timelineData?.morning || allOutfits[0];
+                if (item) {
+                  setActivity(item.activity);
+                  window.scrollTo({ top: 380, behavior: 'smooth' });
+                }
+              }}
+            />
+
+            <TimelineCard
+              outfit={timelineData?.afternoon || allOutfits[1] || allOutfits[0]}
+              time="Buổi chiều · 14:30 – 18:00"
+              title="Thoáng mát & dạo phố tự do"
+              label="CAFE & DẠO PHỐ"
+              temp={`${currentTemp}°C · Gió lộng`}
+              tone="orange"
+              onSelect={() => {
+                const item = timelineData?.afternoon || allOutfits[1] || allOutfits[0];
+                if (item) {
+                  setActivity(item.activity);
+                  window.scrollTo({ top: 380, behavior: 'smooth' });
+                }
+              }}
+            />
+
+            <TimelineCard
+              outfit={timelineData?.evening || allOutfits[2] || allOutfits[0]}
+              time="Buổi tối · 18:30 – 22:30"
+              title="Quyến rũ dưới ánh đèn"
+              label="HẸN HÒ & TIỆC TỐI"
+              temp={`${Math.round(currentTemp - 3)}°C · Mát dịu`}
+              tone="violet"
+              onSelect={() => {
+                const item = timelineData?.evening || allOutfits[2] || allOutfits[0];
+                if (item) {
+                  setActivity(item.activity);
+                  window.scrollTo({ top: 380, behavior: 'smooth' });
+                }
+              }}
+            />
+          </div>
+        </section>
+
+        {/* Closet Upload Banner */}
+        <section className="outfit-closet">
+          <div>
+            <span>
+              <Sparkles size={25} />
+            </span>
+            <div>
+              <h2>Đã lưu {savedOutfits.size} set đồ yêu thích</h2>
+              <p>Các set đồ bạn đã lưu được đồng bộ an toàn trên thiết bị và sẵn sàng sử dụng bất kỳ lúc nào.</p>
             </div>
           </div>
-        </div>
-
-        {/* Style Selector */}
-        <div className="flex flex-col gap-4">
-          <h3 className="font-headline-md text-xl font-bold text-on-surface">
-            Chọn Phong Cách Khác Cho Ngày Hôm Nay
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {outfits.map((outfit) => (
-              <OutfitCard
-                key={outfit.id}
-                outfit={outfit}
-                isSelected={selectedOutfit.id === outfit.id}
-                onSelect={() => setSelectedOutfit(outfit)}
-              />
-            ))}
-          </div>
-        </div>
+          <button type="button" onClick={crawlFreshOutfits}>
+            <RefreshCw size={18} className={refreshing ? 'spin' : ''} /> Cập nhật xu hướng thời trang
+          </button>
+        </section>
       </div>
+
+      {/* Floating Notification Toast */}
+      {toastMessage && (
+        <div
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            background: '#1e293b',
+            color: '#fff',
+            padding: '12px 20px',
+            borderRadius: '99px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
+            fontSize: '13px',
+            fontWeight: 600,
+            zIndex: 9999,
+          }}
+        >
+          <CheckCircle2 size={18} style={{ color: '#4ade80' }} />
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 }
