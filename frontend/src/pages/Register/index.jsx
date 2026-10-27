@@ -3,7 +3,7 @@ import { CalendarDays, Eye, EyeOff, LockKeyhole, Mail, Rocket, ShieldCheck, User
 import { Link, useNavigate } from 'react-router-dom';
 import AuthShowcase from '../../components/auth/AuthShowcase';
 import GoogleIcon from '../../components/auth/GoogleIcon';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Register() {
   const [form, setForm] = useState({ name: '', email: '', password: '', confirmPassword: '' });

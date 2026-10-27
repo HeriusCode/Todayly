@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { useNavigate } from 'react-router-dom';
 import { BadgeCheck, Bell, CalendarDays, Camera, Check, ChevronRight, Coffee, Edit3, Heart, MapPin, MapPinned, Moon, Palette, Plus, Ruler, Save, Settings2, Share2, ShieldCheck, Sparkles, Utensils, X, Zap, LogOut } from 'lucide-react';
 

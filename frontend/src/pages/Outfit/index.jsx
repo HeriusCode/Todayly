@@ -17,7 +17,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { outfitService } from '../../services/outfitService';
 import { scheduleService } from '../../services/scheduleService';
 import { weatherService } from '../../services/weatherService';

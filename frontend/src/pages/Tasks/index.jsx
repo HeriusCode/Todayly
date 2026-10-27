@@ -7,7 +7,7 @@ import TaskCard from '../../components/task/TaskCard';
 import TaskForm from '../../components/task/TaskForm';
 import TimeblockBar from '../../components/task/TimeblockBar';
 import Modal from '../../components/common/Modal';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { taskService } from '../../services/taskService';
 import { formatVietnameseDate, toDateKey } from '../../utils/dates';
 

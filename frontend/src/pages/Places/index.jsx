@@ -19,7 +19,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import PlaceCard from '../../components/place/PlaceCard';
 import PlaceMap from '../../components/place/PlaceMap';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { placeService } from '../../services/placeService';
 import { scheduleService } from '../../services/scheduleService';
 import { weatherService } from '../../services/weatherService';

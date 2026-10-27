@@ -13,7 +13,7 @@
 }
 
 /* The transparent brand asset is intentionally larger than the old icon. */
-img[src='/todayly-logo.png'] {
+img[src$='todayly-logo.png'] {
   width: 64px !important;
   height: 64px !important;
   margin-block: -8px;
@@ -88,7 +88,7 @@ img[src='/todayly-logo.png'] {
     justify-content: center;
   }
 
-  img[src='/todayly-logo.png'] {
+  img[src$='todayly-logo.png'] {
     width: 40px !important;
     height: 40px !important;
     margin-block: -4px;

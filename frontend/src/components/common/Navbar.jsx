@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
+import logo from '../../assets/images/todayly-logo.png';
 
 const navLinks = [
   { to: '/', label: 'Trang chủ' },
@@ -29,7 +30,7 @@ export default function Navbar() {
       <div className="h-20 w-full px-gutter flex items-center justify-between gap-space-md max-w-7xl mx-auto">
         <div className="flex items-center gap-space-lg">
           <Link to="/" className="flex items-center gap-space-sm cursor-pointer">
-            <img alt="Todayly Logo" className="h-10 w-auto object-contain" src="/todayly-logo.png" />
+            <img alt="Todayly Logo" className="h-10 w-auto object-contain" src={logo} />
             <span className="font-headline-md text-headline-md tracking-tight text-on-surface font-extrabold hidden sm:inline">Todayly</span>
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-secondary-fixed text-secondary uppercase tracking-widest self-start mt-1">BETA</span>
           </Link>

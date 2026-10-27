@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { authService } from '../services/authService';
 import { AuthContext } from './AuthContextValue';
 
-export { useAuth } from '../hooks/useAuth';
-
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('todayly_token'));

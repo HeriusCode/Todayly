@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { taskService } from '../../services/taskService';
 import { Activity, ArrowRight, BatteryCharging, BookOpen, CalendarDays, Camera, Check, CheckCircle2, ChevronLeft, ChevronRight, CircleDollarSign, CloudSun, Coffee, Droplets, Edit3, Footprints, Heart, ImageDown, Lock, Plus, Share2, Sparkles, Timer, Utensils, WalletCards } from 'lucide-react';
 

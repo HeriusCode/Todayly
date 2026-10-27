@@ -3,7 +3,7 @@ import { ArrowRight, Check, CheckCircle2, ChevronRight, Clock3, CloudSun, Drople
 import { Link, useNavigate } from 'react-router-dom';
 import Modal from '../../components/common/Modal';
 import TaskForm from '../../components/task/TaskForm';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 import { foodService } from '../../services/foodService';
 import { outfitService } from '../../services/outfitService';
 import { placeService } from '../../services/placeService';

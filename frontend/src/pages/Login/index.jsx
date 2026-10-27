@@ -3,7 +3,7 @@ import { ArrowRight, CalendarDays, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck }
 import { Link, useNavigate } from 'react-router-dom';
 import AuthShowcase from '../../components/auth/AuthShowcase';
 import GoogleIcon from '../../components/auth/GoogleIcon';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../hooks/useAuth';
 
 export default function Login() {
   const [email, setEmail] = useState('');
