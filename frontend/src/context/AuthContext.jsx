@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { authService } from '../services/authService';
 import { AuthContext } from './AuthContextValue';
 
+export { useAuth } from '../hooks/useAuth';
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(() => localStorage.getItem('todayly_token'));
@@ -44,7 +46,7 @@ export const AuthProvider = ({ children }) => {
     return data;
   };
 
-  const updateUserPreferences = async (preferences) => {
+  const updatePreferences = async (preferences) => {
     const updated = await authService.updatePreferences(preferences);
     setUser(updated);
     return updated;
@@ -63,7 +65,7 @@ export const AuthProvider = ({ children }) => {
       isAuthenticated: Boolean(token && user),
       login,
       register,
-      updateUserPreferences,
+      updatePreferences,
       logout,
       loading,
       setUser,
