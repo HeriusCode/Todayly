@@ -63,6 +63,7 @@ const outfitSchema = new mongoose.Schema(
 
 outfitSchema.index({ activity: 1, isFeatured: 1 });
 outfitSchema.index({ weatherTags: 1 });
+outfitSchema.index({ active: 1, isFeatured: -1, likesCount: -1 });
 
 const Outfit = mongoose.model('Outfit', outfitSchema);
 

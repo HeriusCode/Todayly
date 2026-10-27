@@ -1,10 +1,18 @@
 import api from './api';
+import { cachedRequest, clearRequestCache, paramsKey } from './requestCache';
 
 export const outfitService = {
   getAll: async (params = {}) => {
     try {
-      const res = await api.get('/outfits', { params: { limit: 100, ...params } });
-      return res.data;
+      const requestParams = { limit: 100, ...params };
+      return await cachedRequest(
+        `outfits:${paramsKey(requestParams)}`,
+        async () => {
+          const res = await api.get('/outfits', { params: requestParams });
+          return res.data;
+        },
+        { ttl: 5 * 60_000, persist: true },
+      );
     } catch (error) {
       console.warn('Lỗi tải dữ liệu outfits:', error);
       return { count: 0, outfits: [], timeline: {} };
@@ -38,12 +46,8 @@ export const outfitService = {
     }
   },
 
-  crawlNew: async () => {
-    try {
-      const res = await api.post('/outfits/crawl');
-      return res.data;
-    } catch (error) {
-      throw error;
-    }
+  refreshFromDatabase: async (params = {}) => {
+    clearRequestCache('outfits:');
+    return outfitService.getAll(params);
   },
 };

@@ -56,6 +56,7 @@ const placeSchema = new mongoose.Schema(
 
 placeSchema.index({ location: '2dsphere' });
 placeSchema.index({ externalId: 1, source: 1 }, { unique: true });
+placeSchema.index({ active: 1, rating: -1 });
 
 const Place = mongoose.model('Place', placeSchema);
 

@@ -57,5 +57,6 @@ const foodSchema = new mongoose.Schema(
 foodSchema.index({ source: 1, externalId: 1 }, { unique: true });
 foodSchema.index({ location: '2dsphere' });
 foodSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+foodSchema.index({ active: 1, mealType: 1, lastSyncedAt: -1 });
 
 export default mongoose.model('Food', foodSchema);

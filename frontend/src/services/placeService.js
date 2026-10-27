@@ -1,4 +1,5 @@
 import api from './api';
+import { cachedRequest, paramsKey } from './requestCache';
 
 // GPS is preferred. This is only used when the browser/IP location is unavailable.
 const DEFAULT_COORDS = { latitude: 16.0544, longitude: 108.2022 }; // Đà Nẵng
@@ -58,8 +59,14 @@ export const getDevicePosition = async (forceRefresh = false) => {
 export const placeService = {
   getAll: async (params = {}) => {
     try {
-      const response = await api.get('/places', { params });
-      return Array.isArray(response.data) ? response.data : response.data?.places || [];
+      return await cachedRequest(
+        `places:${paramsKey(params)}`,
+        async () => {
+          const response = await api.get('/places', { params });
+          return Array.isArray(response.data) ? response.data : response.data?.places || [];
+        },
+        { ttl: 5 * 60_000, persist: true },
+      );
     } catch {
       return [];
     }

@@ -467,6 +467,29 @@ const upsertPlaces = async (places) => {
   return count;
 };
 
+export const refreshPlaceDatabase = async ({
+  lat = 16.0544,
+  lon = 108.2022,
+  radius = DEFAULT_RADIUS,
+} = {}) => {
+  if (!isConnected) throw new Error('MongoDB chưa kết nối.');
+  const parsedLat = Number(lat);
+  const parsedLon = Number(lon);
+  const parsedRadius = Math.min(MAX_RADIUS, Math.max(500, Number(radius) || DEFAULT_RADIUS));
+  let places = await fetchGooglePlaces(parsedLat, parsedLon, parsedRadius);
+  const googleCount = places.length;
+  let osmCount = 0;
+
+  if (places.length < MIN_GOOGLE_CACHE_RESULTS) {
+    const osmPlaces = await fetchOsmPlaces(parsedLat, parsedLon, parsedRadius);
+    osmCount = osmPlaces.length;
+    places = [...places, ...osmPlaces];
+  }
+
+  const totalSaved = await upsertPlaces(places);
+  return { googleCount, osmCount, totalSaved };
+};
+
 // Main Nearby Endpoint
 export const getNearbyPlaces = async (req, res, next) => {
   try {
@@ -479,7 +502,6 @@ export const getNearbyPlaces = async (req, res, next) => {
       lon,
       lng,
       radius = DEFAULT_RADIUS,
-      refresh = 'false',
       category = 'all',
       limit = MAX_RESULTS,
     } = req.query;
@@ -487,11 +509,6 @@ export const getNearbyPlaces = async (req, res, next) => {
     const parsedLat = Number(lat || 16.0544);
     const parsedLon = Number(lon || lng || 108.2022);
     const parsedRadius = Math.min(MAX_RADIUS, Math.max(500, Number(radius)));
-    const shouldRefresh = refresh === 'true';
-
-    console.log(`📍 [PlaceController] Truy vấn địa điểm gần [${parsedLat}, ${parsedLon}], bán kính: ${parsedRadius}m, refresh: ${shouldRefresh}`);
-
-    // Query existing cached places within radius
     const baseGeoQuery = {
       active: true,
       location: {
@@ -509,36 +526,26 @@ export const getNearbyPlaces = async (req, res, next) => {
       baseGeoQuery.categoryKey = category;
     }
 
-    let cachedPlaces = await Place.find(baseGeoQuery).limit(Number(limit));
-
-    // Crawl new data if insufficient cache or refresh requested
-    if (shouldRefresh || cachedPlaces.length < MIN_GOOGLE_CACHE_RESULTS) {
-      console.log(`🌐 [PlaceController] Bắt đầu cào dữ liệu địa điểm thật từ Google Places & OSM... (Hiện có: ${cachedPlaces.length})`);
-      let crawled = await fetchGooglePlaces(parsedLat, parsedLon, parsedRadius);
-
-      if (crawled.length < 15) {
-        console.log('🌐 [PlaceController] Google Places ít hơn 15 kết quả, bổ sung từ OpenStreetMap...');
-        const osmPlaces = await fetchOsmPlaces(parsedLat, parsedLon, parsedRadius);
-        crawled = [...crawled, ...osmPlaces];
-      }
-
-      if (crawled.length > 0) {
-        const savedCount = await upsertPlaces(crawled);
-        console.log(`💾 [PlaceController] Đã lưu thành công ${savedCount} địa điểm vào database MongoDB.`);
-        cachedPlaces = await Place.find(baseGeoQuery).limit(Number(limit));
-      }
+    let refreshState = 'refreshed';
+    try {
+      await refreshPlaceDatabase({ lat: parsedLat, lon: parsedLon, radius: parsedRadius });
+    } catch (refreshError) {
+      refreshState = 'stale-fallback';
+      console.warn('[Place on-demand sync]', refreshError.message);
     }
+    const cachedPlaces = await Place.find(baseGeoQuery).limit(Number(limit)).lean();
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const serialized = cachedPlaces.map((p) => serializePlace(p, parsedLat, parsedLon, baseUrl));
 
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Todayly-Data-Source', `mongodb-${refreshState}`);
     res.json({
       count: serialized.length,
       places: serialized,
       meta: {
         radius: parsedRadius,
         center: { lat: parsedLat, lon: parsedLon },
-        totalInDB: await Place.countDocuments({ active: true }),
       },
     });
   } catch (error) {
@@ -584,8 +591,10 @@ export const getPlaces = async (req, res, next) => {
     const query = { active: true };
     if (category && category !== 'all') query.categoryKey = category;
 
-    const places = await Place.find(query).limit(Math.min(100, Number(limit))).sort({ rating: -1 });
+    const places = await Place.find(query).limit(Math.min(100, Number(limit))).sort({ rating: -1 }).lean();
     const baseUrl = `${req.protocol}://${req.get('host')}`;
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+    res.setHeader('X-Todayly-Data-Source', 'mongodb');
     res.json(places.map((p) => serializePlace(p, null, null, baseUrl)));
   } catch (error) {
     next(error);

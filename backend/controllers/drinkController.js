@@ -454,6 +454,33 @@ const findNearbyDrinks = async (coordinates) => {
   ]);
 };
 
+export const refreshDrinkDatabase = async ({
+  lat = 16.0544,
+  lon = 108.2022,
+  radius = DEFAULT_RADIUS,
+  baseUrl = '',
+} = {}) => {
+  if (!isConnected) throw new Error('MongoDB chưa kết nối.');
+  const coordinates = {
+    lat: Number(lat),
+    lon: Number(lon),
+    radius: Math.min(MAX_RADIUS, Math.max(500, Number(radius) || DEFAULT_RADIUS)),
+  };
+  let googleSaved = 0;
+  let osmSaved = 0;
+
+  if (process.env.GOOGLE_PLACES_API_KEY) {
+    const googleDrinks = await fetchGooglePlaces(coordinates, baseUrl);
+    googleSaved = await saveDrinksToMongo(googleDrinks);
+  }
+  if (googleSaved < MIN_GOOGLE_CACHE_RESULTS) {
+    const osmDrinks = await syncNearbyOSMDrinks(coordinates);
+    osmSaved = Array.isArray(osmDrinks) ? osmDrinks.length : 0;
+  }
+
+  return { googleSaved, osmSaved, totalSaved: googleSaved + osmSaved };
+};
+
 /* =========================================================================
  * 3. FALLBACK: OVERPASS OSM CHO QUÁN NƯỚC
  * ========================================================================= */
@@ -539,64 +566,22 @@ const syncNearbyOSMDrinks = async (coordinates) => {
 
 export const getNearbyDrinks = async (req, res, next) => {
   try {
+    if (!isConnected) return res.status(503).json({ message: 'Cơ sở dữ liệu đang kết nối.' });
     const coordinates = parseCoordinates(req.query, res);
     if (!coordinates) return;
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const forceRefresh = req.query.refresh === 'true';
-
-    // Check DB cache first
-    if (isConnected && !forceRefresh) {
-      const cachedDrinks = await findNearbyDrinks(coordinates);
-      const freshCutoff = Date.now() - 12 * 60 * 60 * 1000;
-      const freshGoogleCount = cachedDrinks.filter((d) => (
-        d.source === 'google_places' && new Date(d.lastSyncedAt).getTime() >= freshCutoff
-      )).length;
-
-      if (freshGoogleCount >= MIN_GOOGLE_CACHE_RESULTS) {
-        res.setHeader('X-Todayly-Drinks-Cache', 'HIT');
-        res.setHeader('X-Todayly-Total-Drinks', String(cachedDrinks.length));
-        return res.json(cachedDrinks.map((d) => serializeDrink(d, baseUrl)));
-      }
+    let refreshState = 'refreshed';
+    try {
+      await refreshDrinkDatabase({ ...coordinates, baseUrl });
+    } catch (refreshError) {
+      refreshState = 'stale-fallback';
+      console.warn('[Drink on-demand sync]', refreshError.message);
     }
-
-    // 1. Prioritize Google Places API (Cafes, Milk Tea, Juice Shops)
-    if (process.env.GOOGLE_PLACES_API_KEY) {
-      try {
-        const googleDrinks = await fetchGooglePlaces(coordinates, baseUrl);
-        if (googleDrinks && googleDrinks.length > 0) {
-          const savedCount = await saveDrinksToMongo(googleDrinks);
-          res.setHeader('X-Todayly-Saved-Drinks', String(savedCount));
-          if (savedCount > 0) {
-            const stored = await findNearbyDrinks(coordinates);
-            res.setHeader('X-Todayly-Total-Drinks', String(stored.length));
-            return res.json(stored.map((d) => serializeDrink(d, baseUrl)));
-          }
-          res.setHeader('X-Todayly-Total-Drinks', String(googleDrinks.length));
-          return res.json(googleDrinks);
-        }
-      } catch (googleError) {
-        console.error(`[Google Places Drinks Warning]: ${googleError.message}`);
-      }
-    }
-
-    // 2. Fallback to MongoDB & OpenStreetMap
-    if (isConnected) {
-      const cached = await findNearbyDrinks(coordinates);
-      if (!cached.length || forceRefresh) {
-        try {
-          await syncNearbyOSMDrinks(coordinates);
-        } catch (osmError) {
-          console.warn(`[OSM Drinks Warning]: ${osmError.message}`);
-        }
-      }
-      const dbDrinks = await findNearbyDrinks(coordinates);
-      if (dbDrinks && dbDrinks.length > 0) {
-        return res.json(dbDrinks.map((d) => serializeDrink(d, baseUrl)));
-      }
-    }
-
-    res.json([]);
+    const drinks = await findNearbyDrinks(coordinates);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Todayly-Data-Source', `mongodb-${refreshState}`);
+    res.json(drinks.map((drink) => serializeDrink(drink, baseUrl)));
   } catch (error) {
     next(error);
   }
@@ -637,8 +622,10 @@ export const getDrinks = async (req, res, next) => {
     if (category && category !== 'all') query.category = category;
     if (type && type !== 'all') query.drinkType = type;
 
-    const drinks = await Drink.find(query).limit(Math.min(100, Number(limit))).sort({ rating: -1 });
+    const drinks = await Drink.find(query).limit(Math.min(100, Number(limit))).sort({ rating: -1 }).lean();
     const baseUrl = `${req.protocol}://${req.get('host')}`;
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+    res.setHeader('X-Todayly-Data-Source', 'mongodb');
     res.json(drinks.map((d) => serializeDrink(d, baseUrl)));
   } catch (error) {
     next(error);

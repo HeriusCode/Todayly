@@ -141,7 +141,7 @@ export default function Places() {
 
   useEffect(() => {
     let active = true;
-    loadPlaces(radius);
+    loadPlaces(radius, true);
 
     weatherService
       .getCurrentForDevice()

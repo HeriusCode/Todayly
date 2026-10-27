@@ -16,7 +16,7 @@ const getPosition = () => new Promise((resolve) => {
     {
       enableHighAccuracy: true,
       timeout: 8000,
-      maximumAge: 300000,
+      maximumAge: 0,
     }
   );
 });

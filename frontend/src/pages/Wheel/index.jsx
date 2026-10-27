@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { foodService } from '../../services/foodService';
 import { drinkService } from '../../services/drinkService';
-import { placeService } from '../../services/placeService';
+import { getDevicePosition, placeService } from '../../services/placeService';
 import { ArrowRight, Check, ChevronRight, CircleHelp, Coins, Dices, Gift, Hash, History, MapPin, PartyPopper, Plus, RotateCcw, Shuffle, Sparkles, Ticket, Trash2, Utensils, WandSparkles } from 'lucide-react';
 
 const palette = ['#4f46e5', '#fd761a', '#00a875', '#9c5cff', '#ee4d7c', '#f5b82e', '#2f80ed', '#e35f45'];
@@ -29,9 +29,23 @@ export default function Wheel() {
   const [pickerText, setPickerText] = useState('Đi cafe, Đi biển, Xem phim, Ở nhà chill'); const [pickerResult, setPickerResult] = useState('');
 
   useEffect(() => {
-    Promise.allSettled([foodService.getAll(), drinkService.getAll(), placeService.getAll()]).then(([foods, drinks, places]) => setData({
-      food: foods.status === 'fulfilled' ? foods.value : [], drink: drinks.status === 'fulfilled' ? drinks.value : [], place: places.status === 'fulfilled' ? places.value : []
-    }));
+    let active = true;
+    getDevicePosition(true).then((position) => {
+      const { latitude: lat, longitude: lon } = position.coords;
+      return Promise.allSettled([
+        foodService.getNearby({ lat, lon, radius: 5000 }),
+        drinkService.getNearby({ lat, lon, radius: 5000 }),
+        placeService.getNearby({ lat, lon, radius: 5000 }),
+      ]);
+    }).then(([foods, drinks, places]) => {
+      if (!active) return;
+      setData({
+        food: foods.status === 'fulfilled' ? foods.value : [],
+        drink: drinks.status === 'fulfilled' ? drinks.value : [],
+        place: places.status === 'fulfilled' ? places.value : [],
+      });
+    }).catch(() => {});
+    return () => { active = false; };
   }, []);
 
   const segments = useMemo(() => {

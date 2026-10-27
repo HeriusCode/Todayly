@@ -1614,7 +1614,7 @@ const REAL_FASHION_CATALOG = [
 ];
 
 // Seed/upsert catalog into MongoDB Atlas permanently
-const seedFashionCatalog = async () => {
+export const refreshOutfitDatabase = async () => {
   if (!isConnected) return 0;
   let count = 0;
   for (const outfit of REAL_FASHION_CATALOG) {
@@ -1631,7 +1631,6 @@ const seedFashionCatalog = async () => {
   }
   return count;
 };
-
 // 1. Get All Outfits with smart weather & activity filtering
 export const getOutfits = async (req, res, next) => {
   try {
@@ -1639,15 +1638,7 @@ export const getOutfits = async (req, res, next) => {
       return res.status(503).json({ message: 'Cơ sở dữ liệu đang kết nối, vui lòng thử lại sau.' });
     }
 
-    const { activity, weather, temp, refresh = 'false', limit = 100 } = req.query;
-
-    // Check count in MongoDB; if empty or force refresh requested, crawl/seed
-    const totalInDb = await Outfit.countDocuments({ active: true });
-    if (totalInDb === 0 || refresh === 'true') {
-      console.log(`👗 [OutfitController] Bắt đầu cào và lưu dữ liệu outfit thật vào MongoDB Atlas... (Hiện có: ${totalInDb})`);
-      const seededCount = await seedFashionCatalog();
-      console.log(`💾 [OutfitController] Đã lưu thành công ${seededCount} outfits vào MongoDB Atlas!`);
-    }
+    const { activity, weather, temp, limit = 100 } = req.query;
 
     const query = { active: true };
     if (activity && activity !== 'all') {
@@ -1666,21 +1657,27 @@ export const getOutfits = async (req, res, next) => {
       }
     }
 
-    let results = await Outfit.find(query).limit(Number(limit)).sort({ isFeatured: -1, likesCount: -1 });
+    let results = await Outfit.find(query).limit(Number(limit)).sort({ isFeatured: -1, likesCount: -1 }).lean();
 
     // Fallback to all outfits if strict weather query returned too few
     if (results.length === 0 && activity && activity !== 'all') {
-      results = await Outfit.find({ active: true, activity }).limit(Number(limit));
+      results = await Outfit.find({ active: true, activity }).limit(Number(limit)).lean();
     }
     if (results.length === 0) {
-      results = await Outfit.find({ active: true }).limit(Number(limit));
+      results = await Outfit.find({ active: true }).limit(Number(limit)).lean();
     }
 
-    // Prepare timeline items (morning, afternoon, evening)
-    const morning = await Outfit.findOne({ active: true, timelinePeriod: 'morning' }) || results[0];
-    const afternoon = await Outfit.findOne({ active: true, timelinePeriod: 'afternoon' }) || results[1] || results[0];
-    const evening = await Outfit.findOne({ active: true, timelinePeriod: 'evening' }) || results[2] || results[0];
+    const [morningDoc, afternoonDoc, eveningDoc] = await Promise.all([
+      Outfit.findOne({ active: true, timelinePeriod: 'morning' }).lean(),
+      Outfit.findOne({ active: true, timelinePeriod: 'afternoon' }).lean(),
+      Outfit.findOne({ active: true, timelinePeriod: 'evening' }).lean(),
+    ]);
+    const morning = morningDoc || results[0] || null;
+    const afternoon = afternoonDoc || results[1] || results[0] || null;
+    const evening = eveningDoc || results[2] || results[0] || null;
 
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+    res.setHeader('X-Todayly-Data-Source', 'mongodb');
     res.json({
       count: results.length,
       outfits: results,
@@ -1690,7 +1687,6 @@ export const getOutfits = async (req, res, next) => {
         evening,
       },
       meta: {
-        totalInDB: await Outfit.countDocuments({ active: true }),
         currentFilter: { activity, weather, temp },
       },
     });
@@ -1704,19 +1700,18 @@ export const getOutfitTimeline = async (req, res, next) => {
   try {
     if (!isConnected) return res.status(503).json({ message: 'Cơ sở dữ liệu đang kết nối.' });
 
-    const totalInDb = await Outfit.countDocuments({ active: true });
-    if (totalInDb === 0) {
-      await seedFashionCatalog();
-    }
+    const [morning, afternoon, evening] = await Promise.all([
+      Outfit.findOne({ active: true, timelinePeriod: 'morning' }).lean(),
+      Outfit.findOne({ active: true, timelinePeriod: 'afternoon' }).lean(),
+      Outfit.findOne({ active: true, timelinePeriod: 'evening' }).lean(),
+    ]);
 
-    const morning = await Outfit.findOne({ active: true, timelinePeriod: 'morning' });
-    const afternoon = await Outfit.findOne({ active: true, timelinePeriod: 'afternoon' });
-    const evening = await Outfit.findOne({ active: true, timelinePeriod: 'evening' });
-
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+    res.setHeader('X-Todayly-Data-Source', 'mongodb');
     res.json({
-      morning: morning || REAL_FASHION_CATALOG[0],
-      afternoon: afternoon || REAL_FASHION_CATALOG[2],
-      evening: evening || REAL_FASHION_CATALOG[4],
+      morning: morning || null,
+      afternoon: afternoon || null,
+      evening: evening || null,
     });
   } catch (error) {
     next(error);
@@ -1742,22 +1737,6 @@ export const getOutfitById = async (req, res, next) => {
     }
 
     res.json(outfit);
-  } catch (error) {
-    next(error);
-  }
-};
-
-// 4. Force Crawl / Seed Outfits Endpoint
-export const crawlOutfits = async (req, res, next) => {
-  try {
-    if (!isConnected) return res.status(503).json({ message: 'Cơ sở dữ liệu đang kết nối.' });
-    console.log('🔄 [OutfitController] Bắt đầu cào dữ liệu outfit mới và lưu vĩnh viễn vào MongoDB...');
-    const saved = await seedFashionCatalog();
-    const total = await Outfit.countDocuments({ active: true });
-    res.json({
-      message: `Đã cào và lưu thành công ${saved} outfits vào cơ sở dữ liệu MongoDB Atlas!`,
-      totalInDB: total,
-    });
   } catch (error) {
     next(error);
   }

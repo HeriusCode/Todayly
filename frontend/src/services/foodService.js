@@ -1,4 +1,5 @@
 import api from './api';
+import { cachedRequest, paramsKey } from './requestCache';
 
 const nearbyRequests = new Map();
 
@@ -16,7 +17,7 @@ const getPosition = () => new Promise((resolve) => {
     {
       enableHighAccuracy: true,
       timeout: 8000,
-      maximumAge: 300000,
+      maximumAge: 0,
     }
   );
 });
@@ -24,8 +25,14 @@ const getPosition = () => new Promise((resolve) => {
 export const foodService = {
   getAll: async (params = {}) => {
     try {
-      const response = await api.get('/foods', { params });
-      return Array.isArray(response.data) ? response.data : [];
+      return await cachedRequest(
+        `foods:${paramsKey(params)}`,
+        async () => {
+          const response = await api.get('/foods', { params });
+          return Array.isArray(response.data) ? response.data : [];
+        },
+        { ttl: 5 * 60_000, persist: true },
+      );
     } catch {
       return [];
     }

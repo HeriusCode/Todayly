@@ -557,6 +557,32 @@ const findNearby = ({ lat, lon, radius }) => Food.aggregate([
   { $limit: MAX_RESULTS },
 ]);
 
+export const refreshFoodDatabase = async ({
+  lat = 16.0544,
+  lon = 108.2022,
+  radius = DEFAULT_RADIUS,
+  baseUrl = '',
+} = {}) => {
+  if (!isConnected) throw new Error('MongoDB chưa kết nối.');
+  const coordinates = {
+    lat: Number(lat),
+    lon: Number(lon),
+    radius: Math.min(MAX_RADIUS, Math.max(500, Number(radius) || DEFAULT_RADIUS)),
+  };
+  let googleSaved = 0;
+  let osmSaved = 0;
+
+  if (process.env.GOOGLE_PLACES_API_KEY) {
+    const googleFoods = await fetchGooglePlaces(coordinates, baseUrl);
+    googleSaved = await savePlacesToMongo(googleFoods);
+  }
+  if (googleSaved < MIN_GOOGLE_CACHE_RESULTS) {
+    osmSaved = await syncNearbyFoods(coordinates);
+  }
+
+  return { googleSaved, osmSaved, totalSaved: googleSaved + osmSaved };
+};
+
 /* =========================================================================
  * 4. CONTROLLER HANDLERS
  * ========================================================================= */
@@ -566,13 +592,17 @@ export const getFoods = async (req, res, next) => {
     if (!isConnected) {
       return res.json([]);
     }
+    const requestedLimit = Math.min(MAX_RESULTS, Math.max(1, Number(req.query.limit) || MAX_RESULTS));
     const foods = await Food.find({
       active: true,
       mealType: { $ne: 'drink' },
     })
       .sort({ lastSyncedAt: -1, name: 1 })
-      .limit(MAX_RESULTS);
+      .limit(requestedLimit)
+      .lean();
     const baseUrl = `${req.protocol}://${req.get('host')}`;
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+    res.setHeader('X-Todayly-Data-Source', 'mongodb');
     res.json(foods.map((food) => serializeFood(food, baseUrl)));
   } catch (error) {
     next(error);
@@ -581,82 +611,22 @@ export const getFoods = async (req, res, next) => {
 
 export const getNearbyFoods = async (req, res, next) => {
   try {
+    if (!isConnected) return res.status(503).json({ message: 'Cơ sở dữ liệu đang kết nối.' });
     const coordinates = parseCoordinates(req.query, res);
     if (!coordinates) return;
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
-    const forceRefresh = req.query.refresh === 'true';
-
-    if (isConnected && !forceRefresh) {
-      const cachedFoods = await findNearby(coordinates);
-      const freshCutoff = Date.now() - 12 * 60 * 60 * 1000;
-      const freshGoogleCount = cachedFoods.filter((food) => (
-        food.source === 'google_places'
-        && new Date(food.lastSyncedAt).getTime() >= freshCutoff
-      )).length;
-      if (freshGoogleCount >= MIN_GOOGLE_CACHE_RESULTS) {
-        res.setHeader('X-Todayly-Places-Cache', 'HIT');
-        res.setHeader('X-Todayly-Total-Places', String(cachedFoods.length));
-        return res.json(cachedFoods.map((food) => serializeFood(food, baseUrl)));
-      }
+    let refreshState = 'refreshed';
+    try {
+      await refreshFoodDatabase({ ...coordinates, baseUrl });
+    } catch (refreshError) {
+      refreshState = 'stale-fallback';
+      console.warn('[Food on-demand sync]', refreshError.message);
     }
-
-    // 1. Prioritize Google Places API (Food only)
-    if (process.env.GOOGLE_PLACES_API_KEY) {
-      try {
-        const googleFoods = await fetchGooglePlaces(coordinates, baseUrl);
-        if (googleFoods && googleFoods.length > 0) {
-          const savedCount = await savePlacesToMongo(googleFoods);
-          res.setHeader('X-Todayly-Saved-Places', String(savedCount));
-          if (savedCount > 0) {
-            const storedFoods = await findNearby(coordinates);
-            res.setHeader('X-Todayly-Total-Places', String(storedFoods.length));
-            return res.json(storedFoods.map((food) => serializeFood(food, baseUrl)));
-          }
-          res.setHeader('X-Todayly-Total-Places', String(googleFoods.length));
-          return res.json(googleFoods);
-        }
-      } catch (googleError) {
-        console.error(`[Google Places Warning]: ${googleError.message}`);
-      }
-    }
-
-    // 2. Fallback to MongoDB & OpenStreetMap
-    if (isConnected) {
-      const cacheHours = Math.max(1, Number(process.env.FOOD_CACHE_HOURS) || 12);
-      const cacheCutoff = new Date(Date.now() - cacheHours * 60 * 60 * 1000);
-      const cachedNearby = await Food.findOne({
-        active: true,
-        mealType: { $ne: 'drink' },
-        lastSyncedAt: { $gte: cacheCutoff },
-        $or: [
-          { source: 'openstreetmap' },
-          { source: 'google_places', expiresAt: { $gt: new Date() } },
-        ],
-        location: {
-          $near: {
-            $geometry: { type: 'Point', coordinates: [coordinates.lon, coordinates.lat] },
-            $maxDistance: coordinates.radius,
-          },
-        },
-      }).select('_id');
-
-      if (!cachedNearby || req.query.refresh === 'true') {
-        try {
-          await syncNearbyFoods(coordinates);
-        } catch (osmError) {
-          console.warn(`[OSM Sync Warning]: ${osmError.message}`);
-        }
-      }
-
-      const dbFoods = await findNearby(coordinates);
-      if (dbFoods && dbFoods.length > 0) {
-        return res.json(dbFoods.map((food) => serializeFood(food, baseUrl)));
-      }
-    }
-
-    // 3. Fallback: Return empty array instead of 502/503
-    res.json([]);
+    const foods = await findNearby(coordinates);
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('X-Todayly-Data-Source', `mongodb-${refreshState}`);
+    res.json(foods.map((food) => serializeFood(food, baseUrl)));
   } catch (error) {
     next(error);
   }

@@ -167,11 +167,11 @@ export default function Outfit() {
     setTimeout(() => setRefreshing(false), 400);
   };
 
-  // Force re-crawl fresh outfits into MongoDB
-  const crawlFreshOutfits = async () => {
+  // Reload the latest outfits already synchronized to MongoDB.
+  const refreshOutfitsFromDatabase = async () => {
     setRefreshing(true);
     try {
-      const data = await outfitService.getAll({ refresh: 'true' });
+      const data = await outfitService.refreshFromDatabase();
       const outfitsList = Array.isArray(data?.outfits) ? data.outfits : [];
       setAllOutfits(outfitsList);
       if (data?.timeline) setTimelineData(data.timeline);
@@ -458,7 +458,7 @@ export default function Outfit() {
                 </button>
                 <button
                   type="button"
-                  onClick={crawlFreshOutfits}
+                  onClick={refreshOutfitsFromDatabase}
                   title="Cào và làm mới dữ liệu từ server"
                 >
                   <RefreshCw size={17} className={refreshing ? 'spin' : ''} /> Cập nhật dữ liệu
@@ -488,7 +488,7 @@ export default function Outfit() {
                 </p>
                 <button
                   type="button"
-                  onClick={crawlFreshOutfits}
+                  onClick={refreshOutfitsFromDatabase}
                   style={{
                     marginTop: '12px',
                     padding: '10px 20px',
@@ -581,7 +581,7 @@ export default function Outfit() {
               <p>Các set đồ bạn đã lưu được đồng bộ an toàn trên thiết bị và sẵn sàng sử dụng bất kỳ lúc nào.</p>
             </div>
           </div>
-          <button type="button" onClick={crawlFreshOutfits}>
+          <button type="button" onClick={refreshOutfitsFromDatabase}>
             <RefreshCw size={18} className={refreshing ? 'spin' : ''} /> Cập nhật xu hướng thời trang
           </button>
         </section>

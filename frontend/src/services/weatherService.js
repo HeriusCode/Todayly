@@ -1,4 +1,5 @@
 import api from './api';
+import { cachedRequest } from './requestCache';
 
 const getPosition = () =>
   new Promise((resolve, reject) => {
@@ -8,20 +9,26 @@ const getPosition = () =>
     }
     navigator.geolocation.getCurrentPosition(resolve, reject, {
       enableHighAccuracy: true,
-      timeout: 10000,
+      timeout: 4000,
       maximumAge: 300000,
     });
   });
 
 export const weatherService = {
   getCurrentForDevice: async () => {
-    const position = await getPosition();
-    const response = await api.get('/weather/current', {
-      params: {
-        lat: position.coords.latitude,
-        lon: position.coords.longitude,
+    return cachedRequest(
+      'weather:device',
+      async () => {
+        const position = await getPosition();
+        const response = await api.get('/weather/current', {
+          params: {
+            lat: position.coords.latitude,
+            lon: position.coords.longitude,
+          },
+        });
+        return response.data;
       },
-    });
-    return response.data;
+      { ttl: 5 * 60_000 },
+    );
   },
 };

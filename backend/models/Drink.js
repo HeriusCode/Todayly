@@ -62,6 +62,7 @@ const drinkSchema = new mongoose.Schema(
 drinkSchema.index({ source: 1, externalId: 1 }, { unique: true });
 drinkSchema.index({ location: '2dsphere' });
 drinkSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 });
+drinkSchema.index({ active: 1, rating: -1 });
 
 export default mongoose.model('Drink', drinkSchema);
 
