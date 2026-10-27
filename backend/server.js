@@ -40,6 +40,24 @@ app.use('/api/drinks', drinkRoutes);
 app.use('/api/places', placeRoutes);
 app.use('/api/outfits', outfitRoutes);
 
+app.get('/api/debug-routes', (req, res) => {
+  res.json({
+    message: 'Debug endpoint is working',
+    foods: foodRoutes.stack
+      .filter(r => r.route)
+      .map(r => r.route.path),
+    drinks: drinkRoutes.stack
+      .filter(r => r.route)
+      .map(r => r.route.path),
+    places: placeRoutes.stack
+      .filter(r => r.route)
+      .map(r => r.route.path),
+    outfits: outfitRoutes.stack
+      .filter(r => r.route)
+      .map(r => r.route.path),
+  });
+});
+
 app.use(notFound);
 app.use(errorHandler);
 
