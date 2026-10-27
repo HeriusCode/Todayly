@@ -1,37 +1,38 @@
-import { X } from "lucide-react";
-import { useEffect } from "react";
+import React, { useEffect } from 'react';
 
-export default function Modal({ open, title, onClose, children }) {
+export default function Modal({ isOpen, onClose, title, children, maxWidth = 'max-w-xl' }) {
   useEffect(() => {
-    if (!open) return undefined;
-    const close = (event) => event.key === "Escape" && onClose();
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [open, onClose]);
-  if (!open) return null;
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isOpen) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
+  if (!isOpen) return null;
+
   return (
-    <div
-      className="fixed inset-0 z-[100] grid place-items-center bg-slate-950/40 p-4 backdrop-blur-sm"
-      onMouseDown={(event) => event.target === event.currentTarget && onClose()}
-    >
-      <section
-        role="dialog"
-        aria-modal="true"
-        className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-3xl bg-white p-5 shadow-2xl sm:p-7"
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-on-surface/50 backdrop-blur-xs">
+      <div
+        className={`w-full ${maxWidth} bg-surface-container-lowest rounded-3xl p-6 sm:p-8 shadow-2xl border border-outline-variant/30 flex flex-col gap-6 max-h-[90vh] overflow-y-auto`}
+        onClick={(e) => e.stopPropagation()}
       >
-        <header className="mb-5 flex items-center justify-between gap-4">
-          <h2 className="text-xl font-extrabold text-slate-950">{title}</h2>
+        <div className="flex items-center justify-between pb-3 border-b border-surface-container">
+          <h3 className="font-headline-md text-headline-md font-bold text-on-surface">
+            {title}
+          </h3>
           <button
             type="button"
             onClick={onClose}
-            className="cursor-pointer rounded-xl p-2 hover:bg-slate-100"
-            aria-label="Đóng"
+            className="p-1.5 rounded-full hover:bg-surface-container text-outline hover:text-on-surface transition-colors cursor-pointer"
           >
-            <X size={20} />
+            <span className="material-symbols-outlined text-[20px]">close</span>
           </button>
-        </header>
-        {children}
-      </section>
+        </div>
+        <div>{children}</div>
+      </div>
     </div>
   );
 }

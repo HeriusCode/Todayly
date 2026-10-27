@@ -1,34 +1,60 @@
-import { ArrowRight, LockKeyhole, Mail } from 'lucide-react';
 import { useState } from 'react';
+import { ArrowRight, CalendarDays, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import logo from '../../assets/images/todayly-logo.png';
-import { useAuth } from '../../hooks/useAuth';
+import AuthShowcase from '../../components/auth/AuthShowcase';
+import GoogleIcon from '../../components/auth/GoogleIcon';
+import { useAuth } from '../../context/AuthContext';
 
 export default function Login() {
-  const [form, setForm] = useState({ email: '', password: '' });
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const submit = async (event) => {
-    event.preventDefault(); setLoading(true); setError('');
-    try { await login(form); navigate('/'); }
-    catch (reason) { setError(reason.response?.data?.message || 'Đăng nhập không thành công.'); }
-    finally { setLoading(false); }
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setError('');
+    setLoading(true);
+    try {
+      await login({ email, password });
+      navigate('/');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Đăng nhập không thành công. Vui lòng kiểm tra lại email và mật khẩu.');
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return <div className="page-container grid min-h-[calc(100vh-160px)] place-items-center">
-    <section className="card w-full max-w-md p-6 sm:p-8">
-      <img src={logo} alt="Todayly" className="mx-auto h-20 w-20 rounded-2xl object-cover" />
-      <div className="mt-5 text-center"><h1 className="text-3xl font-black">Đăng nhập Todayly</h1><p className="mt-2 text-sm text-slate-500">Tiếp tục quản lý ngày mới của bạn.</p></div>
-      {error && <div className="mt-5 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</div>}
-      <form onSubmit={submit} className="mt-6 space-y-4">
-        <label className="block"><span className="field-label">Email</span><div className="relative"><Mail className="absolute left-3 top-3 text-slate-400" size={18} /><input type="email" required className="field pl-10" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></div></label>
-        <label className="block"><span className="field-label">Mật khẩu</span><div className="relative"><LockKeyhole className="absolute left-3 top-3 text-slate-400" size={18} /><input type="password" required className="field pl-10" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} /></div></label>
-        <button type="submit" disabled={loading} className="btn-primary w-full">{loading ? 'Đang đăng nhập...' : 'Đăng nhập'}<ArrowRight size={17} /></button>
-      </form>
-      <p className="mt-6 text-center text-sm text-slate-500">Chưa có tài khoản? <Link to="/register" className="font-bold text-brand-700">Đăng ký miễn phí</Link></p>
-    </section>
-  </div>;
+  return (
+    <div className="auth-page">
+      <span className="auth-ambient auth-ambient-one" aria-hidden="true" />
+      <span className="auth-ambient auth-ambient-two" aria-hidden="true" />
+      <span className="auth-ambient auth-ambient-three" aria-hidden="true" />
+      <div className="auth-layout auth-login-layout">
+        <section className="auth-form-panel auth-reveal auth-reveal-left">
+          <div className="auth-brand"><span><CalendarDays size={27} /></span><div><strong>Todayly</strong><small>Make Today Better</small></div></div>
+          <header className="auth-heading"><h1>Chào mừng trở lại! ✨</h1><p>Đăng nhập để tiếp tục nhịp sống tích cực, thảnh thơi và đón nhận kế hoạch trọn vẹn từng khoảnh khắc hôm nay.</p></header>
+
+          <button type="button" className="auth-google" onClick={() => setError('Đăng nhập Google chưa được cấu hình. Vui lòng sử dụng email và mật khẩu.')}><GoogleIcon />Tiếp tục nhanh với Google<ArrowRight size={18} /></button>
+          <div className="auth-divider"><span>Hoặc tiếp tục với email</span></div>
+          {error && <div className="auth-error">{error}</div>}
+
+          <form onSubmit={handleSubmit} className="auth-form">
+            <label><span>Địa chỉ Email <small>Cá nhân hoặc công việc</small></span><div className="auth-input"><Mail size={20} /><input type="email" required autoComplete="email" placeholder="ban@example.com" value={email} onChange={(event) => setEmail(event.target.value)} /></div></label>
+            <label><span>Mật khẩu <Link to="/login">Quên mật khẩu?</Link></span><div className="auth-input"><LockKeyhole size={20} /><input type={showPassword ? 'text' : 'password'} required autoComplete="current-password" placeholder="••••••••" value={password} onChange={(event) => setPassword(event.target.value)} /><button type="button" onClick={() => setShowPassword(!showPassword)} aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}>{showPassword ? <EyeOff size={20} /> : <Eye size={20} />}</button></div></label>
+            <label className="auth-check"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} /><span>Duy trì đăng nhập trên thiết bị này</span></label>
+            <button type="submit" disabled={loading} className="auth-submit">{loading ? 'Đang xác thực…' : 'Đăng nhập ngay'}<ArrowRight size={19} /></button>
+          </form>
+
+          <div className="auth-switch">Chưa có tài khoản hôm nay? <Link to="/register">Đăng ký miễn phí</Link></div>
+          <p className="auth-security"><ShieldCheck size={16} /> Bảo mật thông tin & quyền riêng tư người dùng chuẩn SSL</p>
+        </section>
+        <AuthShowcase variant="login" />
+      </div>
+    </div>
+  );
 }

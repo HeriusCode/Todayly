@@ -1,0 +1,65 @@
+import api from './api';
+
+const nearbyRequests = new Map();
+
+const getPosition = () => new Promise((resolve) => {
+  if (!navigator.geolocation) {
+    resolve({ coords: { latitude: 21.0285, longitude: 105.8542 } });
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (pos) => resolve(pos),
+    () => {
+      // Graceful fallback to default coordinates if user denies or times out
+      resolve({ coords: { latitude: 21.0285, longitude: 105.8542 } });
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 8000,
+      maximumAge: 300000,
+    }
+  );
+});
+
+export const drinkService = {
+  getAll: async (params = {}) => {
+    try {
+      const response = await api.get('/drinks', { params });
+      return Array.isArray(response.data) ? response.data : [];
+    } catch {
+      return [];
+    }
+  },
+
+  getNearby: async ({ lat, lon, radius = 2000, refresh = false }) => {
+    const requestKey = [Number(lat).toFixed(4), Number(lon).toFixed(4), radius, refresh].join(':');
+    if (nearbyRequests.has(requestKey)) return nearbyRequests.get(requestKey);
+
+    const request = api.get('/drinks/nearby', {
+      params: { lat, lon, radius, refresh },
+    }).then((response) => (Array.isArray(response.data) ? response.data : []));
+
+    nearbyRequests.set(requestKey, request);
+    try {
+      return await request;
+    } finally {
+      window.setTimeout(() => nearbyRequests.delete(requestKey), 1500);
+    }
+  },
+
+  getNearbyForDevice: async ({ radius = 2000, refresh = false } = {}) => {
+    const position = await getPosition();
+    return drinkService.getNearby({
+      lat: position.coords.latitude,
+      lon: position.coords.longitude,
+      radius,
+      refresh,
+    });
+  },
+
+  getById: async (id) => {
+    const response = await api.get(`/drinks/${id}`);
+    return response.data;
+  },
+};
+

@@ -1,13 +1,50 @@
-import { CloudSun, LocateFixed, MapPin, Wind } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { weatherService } from '../../services/weatherService';
-import { formatVietnameseDate } from '../../utils/dates';
+import React from 'react';
 
-export default function WeatherCard() {
-  const [weather, setWeather] = useState(null);
-  const [message, setMessage] = useState('Đang lấy vị trí hiện tại...');
-  const [now, setNow] = useState(() => new Date());
-  const load = async () => { setMessage('Đang lấy vị trí hiện tại...'); try { setWeather(await weatherService.getCurrentForDevice()); setMessage(''); } catch (error) { setMessage(error.code === 1 ? 'Bạn chưa cho phép truy cập vị trí.' : error.response?.data?.message || error.message); } };
-  useEffect(() => { let active = true; weatherService.getCurrentForDevice().then((data) => { if (active) { setWeather(data); setMessage(''); } }).catch((error) => { if (active) setMessage(error.code === 1 ? 'Bạn chưa cho phép truy cập vị trí.' : error.response?.data?.message || error.message); }); const timer = setInterval(() => setNow(new Date()), 1000); return () => { active = false; clearInterval(timer); }; }, []);
-  return <section className="card bg-gradient-to-br from-blue-50 to-violet-50 p-5 sm:p-6"><div className="flex items-start justify-between gap-3"><div><span className="text-sm text-slate-500">{formatVietnameseDate(now, { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</span><strong className="mt-1 block text-lg">{now.toLocaleTimeString('vi-VN')}</strong><span className="mt-2 flex items-center gap-1.5 font-bold"><MapPin size={17} className="text-brand-600" />{weather?.location || message}</span></div><button type="button" onClick={load} className="cursor-pointer rounded-2xl bg-white p-3 text-amber-500 shadow-sm" title="Lấy lại vị trí"><LocateFixed size={22} /></button></div>{weather && <><div className="mt-5 flex items-center gap-3"><CloudSun size={34} className="text-amber-500" /><strong className="text-3xl">{weather.temperature}°C</strong><span className="text-sm font-semibold text-slate-600">{weather.condition}</span></div><div className="mt-4 grid grid-cols-2 gap-3"><div className="rounded-2xl bg-white/80 p-3 text-sm"><span className="block text-slate-500">Độ ẩm</span><strong>{weather.humidity}</strong></div><div className="rounded-2xl bg-white/80 p-3 text-sm"><span className="flex items-center gap-1 text-slate-500"><Wind size={14} />Không khí</span><strong>{weather.airQuality}</strong></div></div></>}</section>;
+export default function WeatherCard({
+  weather = {
+    date: 'Thứ Năm, 24 Tháng 10, 2024',
+    location: 'Đà Nẵng, Việt Nam',
+    temp: '29°C',
+    condition: 'Trời nắng nhẹ, gió mát ven biển 🌤️',
+    humidity: '68% Dễ chịu',
+    airQuality: 'Tốt (AQI 32)'
+  }
+}) {
+  return (
+    <div className="rounded-2xl bg-surface-container-low p-5 sm:p-6 flex flex-col gap-4 shadow-sm border border-outline-variant/20">
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col">
+          <span className="font-label-sm text-xs text-outline">{weather.date}</span>
+          <h3 className="font-headline-sm text-base font-bold text-on-surface flex items-center gap-1.5">
+            <span className="material-symbols-outlined text-[18px] text-primary">location_on</span>
+            <span>{weather.location}</span>
+          </h3>
+        </div>
+        <div className="px-3 py-1 rounded-full bg-surface-container font-label-sm text-xs font-semibold text-secondary">
+          Thời tiết lý tưởng
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-2 border-t border-surface-container">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-secondary-fixed/50 text-secondary flex items-center justify-center">
+            <span className="material-symbols-outlined text-[28px]">sunny</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="font-display-lg text-3xl font-extrabold text-on-surface">
+              {weather.temp}
+            </span>
+            <span className="font-body-sm text-xs text-on-surface-variant">
+              {weather.condition}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col items-end text-right font-body-sm text-xs text-outline gap-1">
+          <span>Độ ẩm: <strong className="text-on-surface">{weather.humidity}</strong></span>
+          <span>Không khí: <strong className="text-primary">{weather.airQuality}</strong></span>
+        </div>
+      </div>
+    </div>
+  );
 }

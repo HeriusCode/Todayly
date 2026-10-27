@@ -1,15 +1,22 @@
-const timeZone = 'Asia/Bangkok';
+const pad = (value) => String(value).padStart(2, '0');
 
-export const dateKey = (offset = 0) => {
-  const date = new Date(Date.now() + offset * 86400000);
-  return date.toLocaleDateString('sv-SE', { timeZone });
+export const toDateKey = (date = new Date()) =>
+  `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+
+export const addDays = (date, amount) => {
+  const next = new Date(date);
+  next.setDate(next.getDate() + amount);
+  return next;
 };
 
-export const currentWeek = () => {
-  const weekday = new Intl.DateTimeFormat('en-US', { timeZone, weekday: 'short' }).format(new Date());
-  const index = { Mon: 0, Tue: 1, Wed: 2, Thu: 3, Fri: 4, Sat: 5, Sun: 6 }[weekday] ?? 0;
-  return { from: dateKey(-index), to: dateKey(6 - index) };
+export const startOfWeek = (date = new Date()) => {
+  const next = new Date(date);
+  const day = next.getDay() || 7;
+  next.setDate(next.getDate() - day + 1);
+  return next;
 };
 
-export const formatVietnameseDate = (value = new Date(), options = {}) =>
-  new Intl.DateTimeFormat('vi-VN', { timeZone, ...options }).format(value instanceof Date ? value : new Date(`${value}T00:00:00+07:00`));
+export const formatVietnameseDate = (date = new Date()) =>
+  new Intl.DateTimeFormat('vi-VN', {
+    weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
+  }).format(date);

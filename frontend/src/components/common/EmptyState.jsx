@@ -1,20 +1,22 @@
-import { CalendarPlus } from "lucide-react";
+import React from 'react';
 
-export default function EmptyState({
-  title = "Chưa có dữ liệu",
-  description,
-  action,
-}) {
+export default function EmptyState({ icon = 'inbox', title = 'Chưa có dữ liệu', description = 'Hãy thêm mới để bắt đầu quản lý.', actionText, onAction }) {
   return (
-    <div className="grid min-h-56 place-items-center rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center">
-      <div>
-        <CalendarPlus className="mx-auto text-brand-500" size={34} />
-        <h3 className="mt-3 font-extrabold text-slate-900">{title}</h3>
-        {description && (
-          <p className="mt-1 text-sm text-slate-500">{description}</p>
-        )}
-        {action && <div className="mt-4">{action}</div>}
+    <div className="py-12 px-4 flex flex-col items-center justify-center text-center gap-3 bg-surface-container-low rounded-2xl border border-dashed border-outline-variant/40">
+      <div className="w-16 h-16 rounded-full bg-surface-container flex items-center justify-center text-outline mb-1">
+        <span className="material-symbols-outlined text-[32px]">{icon}</span>
       </div>
+      <h4 className="font-headline-sm text-base font-bold text-on-surface">{title}</h4>
+      <p className="font-body-sm text-sm text-on-surface-variant max-w-sm">{description}</p>
+      {actionText && onAction && (
+        <button
+          type="button"
+          onClick={onAction}
+          className="mt-2 px-5 py-2.5 rounded-full bg-primary text-on-primary font-label-md text-sm font-semibold hover:bg-primary-container transition-all cursor-pointer shadow-xs"
+        >
+          {actionText}
+        </button>
+      )}
     </div>
   );
 }

@@ -1,4 +1,61 @@
-import { Heart, MapPin, Star } from 'lucide-react';
 import { useState } from 'react';
-import { getFavorites, toggleFavorite } from '../../utils/favorites';
-export default function FoodCard({ food }) { const [saved, setSaved] = useState(() => getFavorites().some((item) => item.kind === 'food' && item.id === food.id)); return <article className="card overflow-hidden"><div className="relative h-52"><img src={food.image} alt={food.name} className="h-full w-full object-cover" /><button type="button" onClick={() => setSaved(toggleFavorite({ ...food, kind: 'food' }))} className={`absolute right-3 top-3 cursor-pointer rounded-full bg-white p-2 shadow ${saved ? 'text-red-500' : 'text-slate-500'}`}><Heart size={18} fill={saved ? 'currentColor' : 'none'} /></button></div><div className="p-5"><div className="flex items-center justify-between text-sm"><span className="flex items-center gap-1 font-bold text-amber-600"><Star size={16} fill="currentColor" />{food.rating}</span><span className="flex items-center gap-1 text-slate-500"><MapPin size={15} />{food.distance}</span></div><h3 className="mt-3 text-lg font-extrabold">{food.name}</h3><p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">{food.description}</p><div className="mt-4 flex items-center justify-between"><strong className="text-orange-600">{food.priceRange}</strong><span className="rounded-full bg-orange-50 px-2.5 py-1 text-xs font-bold text-orange-700">{food.category}</span></div></div></article>; }
+import { Bookmark, ChevronRight, MapPin, Star, Utensils } from 'lucide-react';
+
+export default function FoodCard({ food, saved, onSaveFavorite, onOpenDetail }) {
+  const [localSaved, setLocalSaved] = useState(false);
+  const [imageFailed, setImageFailed] = useState(false);
+  const isControlled = typeof saved === 'boolean';
+  const isSaved = isControlled ? saved : localSaved;
+
+  const openDetail = () => onOpenDetail?.(food);
+
+  const toggleSaved = (event) => {
+    event.stopPropagation();
+    if (!isControlled) setLocalSaved((current) => !current);
+    onSaveFavorite?.(food);
+  };
+
+  return (
+    <article
+      className="food-place-card"
+      role="button"
+      tabIndex={0}
+      onClick={openDetail}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          openDetail();
+        }
+      }}
+      aria-label={`Xem thông tin ${food.name}`}
+    >
+      <div className="food-place-image">
+        {food.image && !imageFailed ? <img src={food.image} alt={food.name} onError={() => setImageFailed(true)} /> : <div className="food-image-placeholder"><Utensils size={29} /><span>{food.category || 'Quán ăn gần bạn'}</span></div>}
+        {food.photoAttributions?.[0] && !imageFailed && <a className="food-photo-credit" href={food.photoAttributions[0].uri || food.sourceUrl} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>Ảnh: {food.photoAttributions[0].displayName || 'Google Maps'}</a>}
+        <button
+          type="button"
+          className={isSaved ? 'saved' : ''}
+          onClick={toggleSaved}
+          aria-label={isSaved ? 'Bỏ lưu quán' : 'Lưu quán'}
+        >
+          <Bookmark size={17} fill={isSaved ? 'currentColor' : 'none'} />
+        </button>
+      </div>
+
+      <div className="food-place-body">
+        <div className="food-place-metrics">
+          <span><MapPin size={14} /> {food.distance || 'Gần bạn'}</span>
+          <strong><Star size={14} fill={food.rating ? 'currentColor' : 'none'} /> {food.rating ?? 'Chưa có ĐG'}</strong>
+        </div>
+        <h3>{food.name}</h3>
+        <p>{food.description}</p>
+        <footer>
+          <strong>{food.priceLabel || food.priceRange || 'Chưa cập nhật giá'}</strong>
+          <button type="button" onClick={(event) => { event.stopPropagation(); openDetail(); }}>
+            Chi tiết <ChevronRight size={16} />
+          </button>
+        </footer>
+      </div>
+    </article>
+  );
+}

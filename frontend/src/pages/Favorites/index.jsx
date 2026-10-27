@@ -1,6 +1,84 @@
-import { MapPin, Star, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import React, { useState } from 'react';
+import { mockPlaces } from '../../data/mockPlaces';
+import FoodCard from '../../components/food/FoodCard';
+import PlaceCard from '../../components/place/PlaceCard';
 import EmptyState from '../../components/common/EmptyState';
-import PageHeader from '../../components/common/PageHeader';
-import { getFavorites, toggleFavorite } from '../../utils/favorites';
-export default function Favorites() { const [items, setItems] = useState(getFavorites); useEffect(() => { const load = () => setItems(getFavorites()); window.addEventListener('todayly:favorites-changed', load); return () => window.removeEventListener('todayly:favorites-changed', load); }, []); const remove = (item) => { toggleFavorite(item); setItems(getFavorites()); }; return <div className="page-container space-y-6"><PageHeader eyebrow="Bộ sưu tập cá nhân" title="Yêu Thích ❤️" description="Những món ăn và địa điểm bạn đã lưu trên thiết bị này." />{items.length ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{items.map((item) => <article key={`${item.kind}-${item.id}`} className="card overflow-hidden"><img src={item.image} alt={item.name} className="h-44 w-full object-cover" /><div className="p-5"><span className="rounded-full bg-brand-50 px-2 py-1 text-xs font-bold text-brand-700">{item.kind === 'food' ? 'Món ăn' : 'Địa điểm'}</span><h2 className="mt-3 font-extrabold">{item.name}</h2><div className="mt-2 flex gap-3 text-sm text-slate-500">{item.rating && <span className="flex items-center gap-1"><Star size={15} />{item.rating}</span>}{item.distance && <span className="flex items-center gap-1"><MapPin size={15} />{item.distance}</span>}</div><button type="button" onClick={() => remove(item)} className="mt-4 flex cursor-pointer items-center gap-2 text-sm font-bold text-red-600"><Trash2 size={16} />Bỏ lưu</button></div></article>)}</div> : <EmptyState title="Chưa có mục yêu thích" description="Nhấn biểu tượng trái tim ở trang Ăn gì hoặc Đi đâu." />}</div>; }
+
+export default function Favorites() {
+  const [activeTab, setActiveTab] = useState('all');
+
+  const savedFoods = [];
+  const savedPlaces = (mockPlaces || []).slice(0, 2);
+  return (
+    <div className="w-full">
+      <div className="w-full max-w-7xl mx-auto px-gutter py-8 flex flex-col gap-8">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 pb-2 border-b border-surface-container">
+          <div className="flex flex-col gap-2 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-error-container/30 text-error font-label-md text-xs font-semibold w-fit">
+              <span className="material-symbols-outlined text-[16px]">favorite</span>
+              <span>Bộ Sưu Tập Của Bạn</span>
+            </div>
+            <h1 className="font-display-lg text-2xl sm:text-3xl tracking-tight text-on-surface font-extrabold">
+              Danh Sách Yêu Thích ❤️
+            </h1>
+            <p className="font-body-lg text-sm sm:text-base text-on-surface-variant">
+              Tất cả món ngon, quán cafe, điểm đến và phong cách bạn đã lưu lại để trải nghiệm.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 p-1 rounded-full bg-surface-container-low border border-outline-variant/20">
+            {[
+              ['all', 'Tất cả'],
+              ['food', 'Món ăn'],
+              ['drinks', 'Thức uống'],
+              ['places', 'Điểm đến'],
+            ].map(([tab, label]) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => setActiveTab(tab)}
+                className={`px-4 py-2 rounded-full font-label-md text-xs sm:text-sm font-semibold transition-all cursor-pointer ${
+                  activeTab === tab
+                    ? 'bg-primary text-on-primary shadow-xs'
+                    : 'text-on-surface-variant hover:text-on-surface hover:bg-surface-container'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Content Sections */}
+        {(activeTab === 'all' || activeTab === 'food') && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-secondary text-[22px]">restaurant</span>
+              <h2 className="font-headline-md text-xl font-bold text-on-surface">Món Ăn Đã Lưu</h2>
+            </div>
+            {savedFoods.length ? <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {savedFoods.map((f) => (
+                <FoodCard key={f.id} food={f} />
+              ))}
+            </div> : <EmptyState icon="restaurant" title="Chưa có món ăn đã lưu" description="Các món ăn sẽ chỉ xuất hiện ở đây sau khi được lưu thật vào tài khoản của bạn." />}
+          </div>
+        )}
+
+        {(activeTab === 'all' || activeTab === 'places') && (
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <span className="material-symbols-outlined text-tertiary text-[22px]">explore</span>
+              <h2 className="font-headline-md text-xl font-bold text-on-surface">Điểm Hẹn Đã Lưu</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {savedPlaces.map((p) => (
+                <PlaceCard key={p.id} place={p} isSaved={true} />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

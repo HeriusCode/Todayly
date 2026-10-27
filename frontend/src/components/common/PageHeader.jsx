@@ -1,18 +1,29 @@
-export default function PageHeader({ eyebrow, title, description, actions }) {
+import React from 'react';
+
+export default function PageHeader({ badge, title, description, actions }) {
   return (
-    <header className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
-      <div className="max-w-3xl">
-        <span className="inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-extrabold uppercase tracking-wider text-brand-700">
-          {eyebrow}
-        </span>
-        <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-950 sm:text-4xl">
+    <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 pb-2 border-b border-surface-container">
+      <div className="flex flex-col gap-2 max-w-2xl">
+        {badge && (
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-primary-fixed text-primary font-label-md text-xs font-semibold w-fit">
+            {badge.icon && <span className="material-symbols-outlined text-[16px]">{badge.icon}</span>}
+            <span>{badge.text}</span>
+          </div>
+        )}
+        <h1 className="font-display-lg text-display-lg tracking-tight text-on-surface font-extrabold">
           {title}
         </h1>
         {description && (
-          <p className="mt-2 leading-7 text-slate-600">{description}</p>
+          <p className="font-body-lg text-body-lg text-on-surface-variant">
+            {description}
+          </p>
         )}
       </div>
-      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
-    </header>
+      {actions && (
+        <div className="flex flex-wrap items-center gap-3 shrink-0 self-start md:self-auto">
+          {actions}
+        </div>
+      )}
+    </div>
   );
 }
