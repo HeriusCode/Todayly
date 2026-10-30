@@ -1,11 +1,25 @@
 import axios from 'axios';
 
+const normalizeApiUrl = (value) => {
+  const url = String(value || '').trim().replace(/\/+$/, '');
+  if (!url) return '';
+  return /\/api$/i.test(url) ? url : `${url}/api`;
+};
+
+const configuredApiUrl = normalizeApiUrl(import.meta.env.VITE_API_URL);
+const productionUsesLocalhost = /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/i.test(configuredApiUrl);
+
+if (import.meta.env.PROD && (!configuredApiUrl || productionUsesLocalhost)) {
+  throw new Error('VITE_API_URL production phải trỏ tới backend Render, không được dùng localhost.');
+}
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
+  baseURL: configuredApiUrl || 'http://localhost:5000/api',
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30000,
+  // Render free instances can need extra time to wake up before the first request.
+  timeout: 90000,
 });
 
 api.interceptors.request.use(

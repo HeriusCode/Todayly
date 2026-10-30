@@ -71,6 +71,25 @@ npm run dev
 - Frontend: `http://localhost:5173`
 - Backend health: `http://localhost:5000/api/health`
 
+## Deploy frontend lên Vercel
+
+Trong **Vercel → Project Settings → Environment Variables**, thêm biến cho cả
+Production, Preview và Development:
+
+```text
+VITE_API_URL=https://TEN-DICH-VU-RENDER.onrender.com/api
+```
+
+Có thể nhập URL Render không có `/api`; frontend sẽ tự bổ sung. Không đặt biến
+này thành `localhost`, vì mã React chạy trên trình duyệt của người dùng. Sau khi
+thay đổi biến môi trường, cần **Redeploy** frontend để Vite đóng gói URL mới.
+
+Kiểm tra backend trước khi redeploy:
+
+```text
+https://TEN-DICH-VU-RENDER.onrender.com/api/health
+```
+
 ## Dữ liệu
 
 - Đăng ký và đăng nhập sử dụng backend thật, không có tài khoản mẫu.
