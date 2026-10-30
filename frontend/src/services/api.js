@@ -14,7 +14,7 @@ if (import.meta.env.PROD && (!configuredApiUrl || productionUsesLocalhost)) {
 }
 
 const api = axios.create({
-  baseURL: configuredApiUrl || 'http://localhost:5000/api',
+  baseURL: configuredApiUrl || (import.meta.env.DEV ? 'http://localhost:5000/api' : ''),
   headers: {
     'Content-Type': 'application/json',
   },

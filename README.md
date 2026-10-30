@@ -77,7 +77,7 @@ Trong **Vercel → Project Settings → Environment Variables**, thêm biến ch
 Production, Preview và Development:
 
 ```text
-VITE_API_URL=https://TEN-DICH-VU-RENDER.onrender.com/api
+VITE_API_URL=https://todayly.onrender.com/api
 ```
 
 Có thể nhập URL Render không có `/api`; frontend sẽ tự bổ sung. Không đặt biến
@@ -87,7 +87,7 @@ thay đổi biến môi trường, cần **Redeploy** frontend để Vite đóng
 Kiểm tra backend trước khi redeploy:
 
 ```text
-https://TEN-DICH-VU-RENDER.onrender.com/api/health
+https://todayly.onrender.com/api/health
 ```
 
 ## Dữ liệu
